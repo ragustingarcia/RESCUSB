@@ -234,6 +234,28 @@ function Resolve-RescusbPlanGaps($Plan,$Selected,[string]$StateFolder='',[string
         }
     }
 }
+# Creating Windows can take an hour: if the pendrive vanished meanwhile, ask to plug it
+# back in and recognise it by its identity instead of sending the user back to the menu.
+function Wait-RescusbTarget($Target) {
+    while($true){
+        try {return (Assert-Target $Target)}
+        catch {if($_.Exception.Message -notlike '*ya no esta conectado*'){throw}}
+        Write-Host ''
+        Write-Host '  [!] Windows dejó de ver el pendrive.' -ForegroundColor Yellow
+        Write-Host '      Puede haberse desconectado o suspendido mientras se creaba Windows.' -ForegroundColor Gray
+        Write-Host '      Desconectalo, volvé a conectarlo y esperá a que Windows lo muestre.' -ForegroundColor Gray
+        Write-Host '      Todavía no se borró nada y lo ya verificado se conserva.' -ForegroundColor Gray
+        $answer=([string](Read-Host '  Enter cuando esté conectado | 0 para volver al menú')).Trim()
+        if($answer -eq '0'){throw [OperationCanceledException]::new('El pendrive no está conectado. No se borró nada.')}
+        $found=Find-ReconnectedTarget $Target @(Get-DiskInventory)
+        if($found){
+            Write-Host '  [OK] Pendrive reconocido: es el mismo, por modelo, serie e identificador.' -ForegroundColor Green
+            $Target=$found
+        } else {
+            Write-Host '  Todavía no aparece el mismo pendrive. Probá con otro puerto USB.' -ForegroundColor Yellow
+        }
+    }
+}
 function Start-RescusbJob($Catalog,$Settings,$Target,[string]$StateFolder,[switch]$Resume) {
     $root=''
     if($Resume){
@@ -255,7 +277,7 @@ function Start-RescusbJob($Catalog,$Settings,$Target,[string]$StateFolder,[switc
     }
     $now=@($now)
     $pendingIds=@($Settings.images|Where-Object {$_ -notin $now})
-    $null=Assert-Target $Target
+    $Target=Wait-RescusbTarget $Target
     Write-Host ''
     Show-RescusbContents $Catalog $now
     Write-Host ('  Windows: '+(Get-RescusbLanguageLabel $Settings.language)+' | x64 | Edición oficial de consumo.') -ForegroundColor Gray

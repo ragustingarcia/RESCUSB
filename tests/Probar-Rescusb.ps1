@@ -96,6 +96,13 @@ try{
         Equal (Find-RescusbLocalWindows 'windows11' $h 100000 $temp @($f)) $p
         Equal (Find-RescusbLocalWindows 'windows11' ('f'*64) 100000 $temp @($f)) ''
     }
+    Check 'replugged pendrive recognised under a new disk number, never a different one' {
+        $same=FakeDisk;$same.Number=5
+        $other=FakeDisk;$other.Number=6;$other.Serial='OTHER-USB';$other.WmiSerial='OTHER-USB';$other.UniqueId='OTHER-ID';$other.PnpId='USBSTOR\OTHER';$other.Path='\\?\USB#OTHER'
+        Equal (Find-ReconnectedTarget (FakeDisk) @($other,$same)).Number 5
+        Equal (Find-ReconnectedTarget (FakeDisk) @($other)) $null
+        $bigger=FakeDisk;$bigger.Number=5;$bigger.Size=64100000000L;Equal (Find-ReconnectedTarget (FakeDisk) @($bigger)) $null
+    }
     Check 'default settings choose six tools, Windows 10 optional, Spanish x64' {$settings=Get-RescusbSettings (Join-Path $temp 'settings') $catalog;Equal $settings.images.Count 6;Equal ($settings.images -contains 'windows10') $false;Equal $settings.language 'Spanish'}
     Check 'invalid settings cannot add arbitrary tools' {$state=Join-Path $temp 'invalid-settings';$null=New-Item -ItemType Directory -Path $state;Save-JsonAtomic @{schema=1;language='Spanish';images=@('disk-wiper')} (Join-Path $state 'configuracion.json');Reject {Get-RescusbSettings $state $catalog}}
     & $ui {
@@ -147,6 +154,23 @@ try{
         Equal (Start-RescusbJob $catalog $settings (FakeDisk) $temp) 0
         Equal (& $ui {$script:ToolRuns}) 2;Equal (& $ui {$script:SelectedCount}) 7
         & $ui {$script:GapAnswer='0'}
+    }
+    Check 'pendrive that vanished before erasing is awaited and reused, not abandoned' {
+        & $ui {
+            $script:Gone=$true;$script:Replugs=0
+            function script:Assert-Target {param($Expected,[switch]$PartitionChanged);if($Expected.Number -eq 9 -and $script:Gone){throw 'El USB elegido ya no esta conectado.'};return $Expected}
+            function script:Get-DiskInventory {$script:Replugs++;$d=[pscustomobject]@{Number=5};return @($d)}
+            function script:Find-ReconnectedTarget {param($Expected,$Inventory);return $Inventory[0]}
+            $script:SavedAnswer=$script:GapAnswer;$script:GapAnswer=''
+        }
+        Equal (Wait-RescusbTarget (FakeDisk)).Number 5
+        Equal (& $ui {$script:Replugs}) 1
+        & $ui {$script:GapAnswer='0'}
+        Reject {Wait-RescusbTarget (FakeDisk)} 'no está conectado'
+        & $ui {
+            $script:GapAnswer=$script:SavedAnswer
+            function script:Assert-Target {param($Expected,[switch]$PartitionChanged);return $Expected}
+        }
     }
     Check 'complete job automatically passes all seven resolved images and marks readiness' {
         $job=Join-Path $temp 'complete-job';$null=New-Item -ItemType Directory -Path $job

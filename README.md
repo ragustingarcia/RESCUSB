@@ -88,6 +88,7 @@ En el pendrive quedan **ISO**, el identificador de dispositivo, **informe-rescat
 |---|---|
 | Otra sesión abierta | Cerrá las ventanas de versiones anteriores y volvé a abrir INICIAR.bat. No cierres un instalador que esté trabajando. |
 | El pendrive no aparece | Debe ser USB extraíble, tener identidad fiable, estado saludable y capacidad compatible. No hay una opción para forzar discos internos o USB fijos. |
+| Windows dejó de ver el pendrive | Puede pasar mientras se crea Windows, que tarda mucho. Si todavía no se borró nada, RESCUSB lo avisa y espera: desconectalo, volvé a conectarlo y presioná Enter. Lo reconoce aunque Windows le asigne otro número de disco, siempre que coincidan el modelo, la capacidad, las dos series, el identificador PNP y la ruta. Lo ya verificado se conserva. |
 | La ISO de Windows no se acepta | Debajo de «Comprobando la firma de Microsoft» aparece el motivo: idioma, arquitectura, versión o firma. Volvé a crearla con la herramienta eligiendo el idioma de Ajustes y x64, como **Archivo ISO** en Descargas. Ver [Windows con la herramienta oficial de Microsoft](#windows-con-la-herramienta-oficial-de-microsoft). |
 | Descarga interrumpida | Conservá los .part y elegí Continuar. |
 | Servidor sin soporte Range / curl 33 o 416 | Revisá el nombre del parcial afectado. Si decidís empezar de cero, renombrá solo ese .part a una extensión distinta y reintentá. Seguirá ocupando espacio hasta que lo retires. |

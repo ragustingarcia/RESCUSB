@@ -4,7 +4,7 @@ Fecha: **15/10/2026**. Motor probado: **Windows PowerShell 5.1**, el mismo que u
 
 ## Pruebas automáticas sin dispositivos reales
 
-**96 casos aprobados, 0 fallos**: 69 pruebas de controles y transferencias en `tests/Probar.ps1`, 21 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
+**98 casos aprobados, 0 fallos**: 69 pruebas de controles y transferencias en `tests/Probar.ps1`, 23 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
 
 ## Cambios de 2.1.0
 
@@ -15,6 +15,7 @@ En la prueba real, Microsoft volvió a negar el enlace automático, y en un nave
 - **La ISO se verifica por firma.** Se monta en solo lectura y se exige firma válida de Microsoft en `setup.exe` y `sources\setup.exe`. Con DISM, la primera imagen tiene que ser x64, del idioma elegido y de la versión correcta. Se copia con su SHA-256 propio y el informe la marca como verificada por firma. Si hay una ISO que coincide con el hash publicado en la página de Microsoft, se prefiere esa.
 - **Windows 10 opcional.** Sin soporte desde el 14/10/2025, deja de venir marcado por defecto.
 - Comprobar fuentes ya no falla por Windows: informa que se crea al armar el pendrive.
+- **Reconexión del pendrive.** En la prueba real, el Kingston desapareció de Windows mientras se creaba Windows 11 y el programa volvía al menú. Ahora, antes del borrado, RESCUSB avisa, espera a que lo vuelvas a conectar y lo reconoce aunque cambie el número de disco. Exige que coincidan modelo, capacidad, las dos series, el identificador PNP y la ruta; nunca adopta otro dispositivo.
 
 Las pruebas nuevas cubren:
 
@@ -24,11 +25,12 @@ Las pruebas nuevas cubren:
 - la exigencia de firma: un binario firmado por Microsoft se acepta y uno sin firma se rechaza;
 - la arquitectura, el idioma y la versión de la imagen;
 - el nombre y la marca de la copia;
-- Enter abre la herramienta y el armado se completa.
+- Enter abre la herramienta y el armado se completa;
+- el pendrive reconectado se reconoce con otro número de disco y nunca se confunde con otro.
 
 Se descargaron de verdad las dos herramientas (21.591.048 y 19.463.448 bytes, desde `download.microsoft.com`) y su firma se validó. La herramienta de Windows 11 se abrió en una preparación real y empezó a descargar Windows.
 
-**Falta verificar la ISO real que genere la herramienta.** El montaje y la lectura con DISM se simulan en las pruebas.
+**Verificado con una ISO real:** la herramienta generó `Windows.iso` (7.236.550.656 bytes, Windows 11 en español, x64). RESCUSB la montó, validó la firma de Microsoft de los dos `setup.exe` y, con DISM, la arquitectura, el idioma y la versión. La aceptó como `windows11-herramienta-es-ES-2f7deb7b.iso`. En las pruebas automáticas, el montaje y DISM se siguen simulando.
 ## Cambios de 2.0.3
 Corrigen lo que apareció al probar el armado real con el Kingston: Microsoft rechazó Windows 10 y 11 y el programa quedaba sin salida, la consulta de fuentes llenaba la pantalla de barras de curl y el encabezado se desordenaba.
 

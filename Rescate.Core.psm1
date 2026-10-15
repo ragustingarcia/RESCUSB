@@ -187,6 +187,16 @@ function Assert-Target($Expected, [switch]$PartitionChanged) {
     Assert-UniqueIdentity $current[0] $all
     return $current[0]
 }
+# After an unplug/replug Windows may give the same pendrive another disk number.
+# It is accepted only if every other identity field still matches exactly.
+function Find-ReconnectedTarget($Expected, $Inventory) {
+    $matches = @(foreach ($d in $Inventory) {
+        try { Assert-DiskIdentity $Expected $d -Renumbered; $d } catch {}
+    })
+    if ($matches.Count -ne 1) { return $null }
+    Assert-UniqueIdentity $matches[0] $Inventory
+    return $matches[0]
+}
 function Get-UsbCandidates($Inventory) {
     foreach ($d in $Inventory) {
         if (Test-DiskEligible $d) { continue }
