@@ -1,0 +1,16 @@
+# Estado local de cada PC: configuración, informes e identidad del último USB
+estado/
+
+# Copias de versiones anteriores y paquetes generados
+respaldo/
+*.zip
+*.zip.sha256
+
+# Imágenes descargadas o aportadas por el usuario
+ISO-OFICIALES/
+*.iso
+*.part
+
+# Restos de pruebas interrumpidas
+tests/rescusb-test-*/
+tests/*-test-*/

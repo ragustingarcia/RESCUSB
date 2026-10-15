@@ -1,0 +1,7 @@
+# cmd.exe necesita CRLF en los .bat
+*.bat text eol=crlf
+# Los scripts de PowerShell llevan BOM UTF-8 para que la 5.1 lea los acentos: no se tocan
+*.ps1 -text
+*.psm1 -text
+*.png binary
+*.svg text eol=lf
