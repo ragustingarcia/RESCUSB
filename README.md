@@ -115,6 +115,24 @@ Hecho por **[Rodolfo Agustín García](https://ragustingarcia.com/)**.
 
 El kit de autoría incluye metadatos SoftwareApplication/Person, Open Graph/Twitter, imagen propia, favicon, humans.txt, robots.txt, ai.txt, llms.txt, sitemap y una ficha HTML local. El código está publicado en **[github.com/ragustingarcia/RESCUSB](https://github.com/ragustingarcia/RESCUSB)**. RESCUSB todavía no tiene web propia ni ficha de tienda: no se inventan esos enlaces ni se afirma indexación. El detalle está en [SEO-Y-AUTORIA.md](SEO-Y-AUTORIA.md).
 
+## Componentes de terceros
+
+RESCUSB **no incluye ni redistribuye** ninguna de estas herramientas: las descarga de su fuente oficial directamente al pendrive de quien lo usa y verifica su SHA-256. Cada una pertenece a su titular y se rige por su propia licencia, que acepta quien la usa. La licencia de RESCUSB solo cubre el código de este repositorio.
+
+| Componente | Titular | Licencia | Cómo la usa RESCUSB |
+|---|---|---|---|
+| [Ventoy](https://www.ventoy.net/) | Proyecto Ventoy (longpanda) | [GPL-3.0](https://github.com/ventoy/Ventoy/blob/master/License/license-ventoy.txt) | Descarga el ZIP oficial y ejecuta su CLI como programa separado para instalar el arranque. |
+| [SystemRescue](https://www.system-rescue.org/) | Proyecto SystemRescue | [GPL-3.0 o posterior](https://gitlab.com/systemrescue/systemrescue-sources/-/blob/main/LICENSE) en sus fuentes; los paquetes incluidos conservan sus licencias libres | Descarga la ISO oficial. |
+| [Memtest86+](https://memtest.org/) | Proyecto Memtest86+ | [GPL-2.0](https://github.com/memtest86plus/memtest86plus/blob/main/LICENSE) | Descarga el ZIP oficial y extrae la ISO. |
+| [Hiren's BootCD PE](https://www.hirensbootcd.org/) | Hiren's BootCD PE | Distribución gratuita basada en Windows PE de Microsoft, sujeta a sus condiciones (entre ellas, el límite de 72 h de uso continuo); las utilidades incluidas conservan sus licencias | Descarga la ISO oficial. |
+| [Rescuezilla](https://rescuezilla.com/) | Proyecto Rescuezilla | [GPL-3.0](https://github.com/rescuezilla/rescuezilla/blob/master/LICENSE) | Descarga la ISO oficial. |
+| [Ubuntu Desktop](https://ubuntu.com/) | Canonical Ltd. | Software libre, mayormente GPL; marca sujeta a la [política de propiedad intelectual de Canonical](https://ubuntu.com/legal/intellectual-property-policy) | Descarga la ISO oficial. |
+| [Windows 10 y 11](https://www.microsoft.com/software-download/) | Microsoft Corporation | [Términos de licencia de Microsoft](https://www.microsoft.com/useterms); activar Windows requiere una licencia válida | Obtiene el enlace temporal de la página oficial de Microsoft, o usa una ISO oficial que ya tengas. |
+
+También usa programas que vienen con Windows: PowerShell 5.1, `curl.exe` y Robocopy. No los incluye ni los modifica.
+
+Los nombres y marcas mencionados pertenecen a sus titulares. Que RESCUSB los nombre no implica ningún aval ni relación con esos proyectos.
+
 ## Licencia
 
-RESCUSB es software propietario de Rodolfo Agustín García: podés descargarlo y usarlo sin cargo para preparar pendrives, pero no redistribuirlo, modificarlo para publicarlo ni venderlo. Ver [LICENSE](LICENSE). Las imágenes y herramientas que descarga pertenecen a sus respectivos proyectos y conservan sus propias condiciones; RESCUSB no las incluye ni las redistribuye.
+RESCUSB es software propietario de Rodolfo Agustín García: podés descargarlo y usarlo sin cargo para preparar pendrives, pero no redistribuirlo, modificarlo para publicarlo ni venderlo. Ver [LICENSE](LICENSE). Las imágenes y herramientas que descarga pertenecen a sus respectivos proyectos y conservan sus propias condiciones; RESCUSB no las incluye ni las redistribuye (ver [Componentes de terceros](#componentes-de-terceros)).

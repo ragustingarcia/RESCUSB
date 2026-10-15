@@ -17,6 +17,12 @@ Todos los derechos reservados.
    licencia no alcanza ni pretende alcanzar a esas herramientas: lo que
    protege es el software propio que las obtiene, las verifica y las ordena.
 
+   El detalle de cada componente, su titular y su licencia está en la
+   sección «Componentes de terceros» del README. RESCUSB ejecuta Ventoy como
+   programa separado, sin incorporar ni modificar su código. Los nombres y
+   marcas de terceros se mencionan solo para identificarlos y no implican
+   aval ni relación con sus titulares.
+
 2. USO PERMITIDO
 
    Se permite descargar este repositorio y ejecutar RESCUSB, sin cargo, para
