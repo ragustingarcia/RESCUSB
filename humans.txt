@@ -1,0 +1,13 @@
+/* TEAM */
+Developer: Rodolfo Agustín García
+Site: https://ragustingarcia.com/
+GitHub: https://github.com/ragustingarcia
+Location: Tigre, Buenos Aires, AR
+
+/* PRODUCT */
+Name: RESCUSB
+Version: 2.0.3
+Components: Windows BAT, Windows PowerShell 5.1, Windows curl, Ventoy, official ISO sources
+Interface: Local terminal
+Repository: https://github.com/ragustingarcia/RESCUSB
+Public project URL: Not published

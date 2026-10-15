@@ -1,0 +1,39 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://ragustingarcia.com/#person",
+      "name": "Rodolfo Agustín García",
+      "givenName": "Rodolfo Agustín",
+      "familyName": "García",
+      "url": "https://ragustingarcia.com/",
+      "image": "https://ragustingarcia.com/assets/og-image.png",
+      "sameAs": [
+        "https://github.com/ragustingarcia",
+        "https://www.linkedin.com/in/ragustingarcia/",
+        "https://rcwe.ragustingarcia.com/"
+      ],
+      "alumniOf": [
+        { "@type": "EducationalOrganization", "name": "Universidad de San Andrés", "url": "https://www.udesa.edu.ar/" },
+        { "@type": "EducationalOrganization", "name": "Pontificia Universidad Católica Argentina", "url": "https://uca.edu.ar/" }
+      ],
+      "address": { "@type": "PostalAddress", "addressLocality": "Tigre", "addressRegion": "Buenos Aires", "addressCountry": "AR" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "urn:rescusb:software",
+      "name": "RESCUSB",
+      "description": "RESCUSB prepara un pendrive de rescate para Windows: instala Ventoy, descarga siete herramientas oficiales y verifica su integridad automáticamente.",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Windows 10 / Windows 11 x64",
+      "softwareVersion": "2.0.3",
+      "sameAs": ["https://github.com/ragustingarcia/RESCUSB"],
+      "inLanguage": "es-AR",
+      "image": "assets/og-image.png",
+      "author": { "@id": "https://ragustingarcia.com/#person" },
+      "creator": { "@id": "https://ragustingarcia.com/#person" },
+      "publisher": { "@id": "https://ragustingarcia.com/#person" }
+    }
+  ]
+}

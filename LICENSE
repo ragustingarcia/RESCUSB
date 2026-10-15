@@ -1,0 +1,61 @@
+Licencia de Software Propietario | RESCUSB
+
+Copyright © 2026 Rodolfo Agustín García | https://ragustingarcia.com/
+Todos los derechos reservados.
+
+1. TITULARIDAD
+
+   RESCUSB, incluyendo su código fuente, su interfaz de terminal, su identidad
+   visual, su documentación y su diseño, es obra de Rodolfo Agustín García y
+   está protegido por las leyes de propiedad intelectual de la República
+   Argentina y los tratados internacionales aplicables.
+
+   RESCUSB no incluye ni redistribuye las herramientas que prepara. Ventoy,
+   SystemRescue, Memtest86+, Hiren's BootCD PE, Rescuezilla, Ubuntu y las
+   imágenes de Windows se descargan de sus fuentes oficiales y pertenecen a
+   sus respectivos titulares, bajo sus propias licencias y condiciones. Esta
+   licencia no alcanza ni pretende alcanzar a esas herramientas: lo que
+   protege es el software propio que las obtiene, las verifica y las ordena.
+
+2. USO PERMITIDO
+
+   Se permite descargar este repositorio y ejecutar RESCUSB, sin cargo, para
+   preparar pendrives propios o de terceros. Ese permiso no incluye ninguna
+   otra licencia de copia, modificación, distribución, sublicencia ni venta
+   del software, salvo autorización previa, expresa y por escrito del titular.
+
+   Que el repositorio sea público y que el programa se use sin cargo no
+   otorga derechos sobre su código fuente. El acceso al repositorio es al solo
+   efecto de uso, revisión o evaluación, y no implica cesión de derechos de
+   ningún tipo.
+
+3. PROHIBICIONES
+
+   Sin autorización escrita del titular queda prohibido:
+
+   a) Explotar comercialmente el software o cualquiera de sus partes,
+      incluido cobrar por el programa o por pendrives preparados con él
+      presentados como producto propio.
+   b) Crear obras derivadas o productos competidores basados en él.
+   c) Redistribuir el código fuente, total o parcialmente.
+   d) Publicar el programa, o una variante suya, en cualquier tienda de
+      aplicaciones o canal de distribución.
+   e) Remover o alterar los avisos de autoría y copyright.
+
+4. SIN GARANTÍA
+
+   EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO,
+   EXPRESA O IMPLÍCITA, INCLUYENDO PERO NO LIMITÁNDOSE A LAS GARANTÍAS DE
+   COMERCIABILIDAD, IDONEIDAD PARA UN PROPÓSITO PARTICULAR Y NO INFRACCIÓN.
+   EN NINGÚN CASO EL TITULAR SERÁ RESPONSABLE POR RECLAMOS, DAÑOS U OTRAS
+   RESPONSABILIDADES DERIVADAS DEL USO DEL SOFTWARE.
+
+   La preparación borra todas las particiones y archivos del pendrive
+   elegido. La responsabilidad de elegir el dispositivo correcto, de
+   confirmar el borrado y de mantener copias de respaldo de su contenido es
+   del usuario. La descarga verificada de una imagen no garantiza que arranque
+   en un equipo determinado.
+
+5. CONTACTO
+
+   Para consultas sobre licenciamiento: https://ragustingarcia.com/#contact
