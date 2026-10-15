@@ -1,36 +1,21 @@
 ﻿# RESCUSB | Rodolfo Agustin Garcia | https://ragustingarcia.com/
-# Reads Microsoft's public download page and its normal anonymous session flow.
-# Does not execute remote JavaScript, use third-party ISO hosts or bypass service refusals.
+# Windows always comes from Microsoft's Media Creation Tool, verified by Microsoft's signature.
+# An ISO that matches the SHA-256 published on Microsoft's page is reused first.
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 
-function Invoke-MicrosoftRequest([string]$Url, $Session, [switch]$Json) {
+function Invoke-MicrosoftRequest([string]$Url) {
     $u=Assert-Https $Url
-    if($u.DnsSafeHost -notin @('www.microsoft.com','ov-df.microsoft.com')) {throw 'Servidor de metadatos Microsoft no autorizado.'}
+    if($u.DnsSafeHost -ne 'www.microsoft.com') {throw 'Servidor de metadatos Microsoft no autorizado.'}
     [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     try {
-        $r=Invoke-WebRequest -Uri $Url -WebSession $Session -Headers @{Referer='https://www.microsoft.com/en-us/software-download/windows11'} -UseBasicParsing -MaximumRedirection 0 -TimeoutSec 30
+        # Microsoft shows the hash table to any client; a non-Windows agent avoids the redirect to the tool.
+        $r=Invoke-WebRequest -Uri $Url -UserAgent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36' -UseBasicParsing -MaximumRedirection 0 -TimeoutSec 30
         if([int]$r.StatusCode -ne 200){throw 'Respuesta HTTP inesperada.'}
         $text=[Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray())
         if($text.Length -gt 4194304){throw 'Metadatos demasiado grandes.'}
     } catch {throw ('No se pudo consultar {0}. Comprueba Internet o reintenta mas tarde.' -f $u.DnsSafeHost)}
-    if($Json){
-        $data=$text|ConvertFrom-Json
-        $errorProperty=$data.PSObject.Properties['Errors']
-        if($errorProperty -and @($errorProperty.Value|Where-Object {$_}).Count -gt 0){
-            throw 'Microsoft no autorizo esta descarga en esta sesion.'
-        }
-        return $data
-    }
     return $text
-}
-function Get-MicrosoftEdition([string]$Html,[string]$Id) {
-    $select=[regex]::Match($Html,'(?is)<select\b[^>]*\bid=["'']product-edition["''][^>]*>(.*?)</select>')
-    $editions=@([regex]::Matches($select.Groups[1].Value,'(?is)<option\b[^>]*value=["''](\d+)["''][^>]*>(.*?)</option>'))
-    $version=if($Id -eq 'windows10'){'10'}elseif($Id -eq 'windows11'){'11'}else{throw 'Windows no reconocido.'}
-    $matches=@($editions|Where-Object {$_.Groups[2].Value -match ('Windows\s+'+$version+'\b') -and $_.Groups[2].Value -notmatch '(?i)ARM|Enterprise'})
-    if($matches.Count -ne 1){throw 'Microsoft cambio el selector de ISO. No se elige una edicion por aproximacion.'}
-    return $matches[0].Groups[1].Value
 }
 function Get-MicrosoftHash([string]$Html,[string]$Language) {
     $expected=$Language+' 64-bit';$hashes=@()
@@ -44,37 +29,6 @@ function Get-MicrosoftHash([string]$Html,[string]$Language) {
     $unique=@($hashes|Select-Object -Unique)
     if($unique.Count -ne 1){throw 'No se encontro un SHA-256 oficial unico para el idioma y la arquitectura elegidos.'}
     return $unique[0]
-}
-function Get-MicrosoftClientSettings([string]$Html,$Session) {
-    $scripts=@([regex]::Matches($Html,'(?is)<script\b[^>]*\bsrc=["'']([^"'']+)["'']'))
-    $urls=@($scripts|ForEach-Object {$_.Groups[1].Value}|Where-Object {$_ -match '^/foxtrot/.*?/sds/components/content/sdsbase/.*?/site\.[a-zA-Z0-9.]+\.js$'}|Select-Object -Unique)
-    if($urls.Count -ne 1){throw 'No se pudo identificar el cliente oficial de Microsoft.'}
-    $js=Invoke-MicrosoftRequest ('https://www.microsoft.com'+$urls[0]) $Session
-    $profile=[regex]::Match($js,'profile(?:\\x3d|=)([a-fA-F0-9]{12})').Groups[1].Value
-    $instance=[regex]::Match($js,'instanceId(?:\\x3d|=)([a-fA-F0-9-]{36})').Groups[1].Value
-    if(-not $profile -or -not $instance){throw 'Microsoft cambio los metadatos de su cliente de descarga.'}
-    return [pscustomobject]@{Profile=$profile;Instance=$instance}
-}
-function Initialize-MicrosoftSession($Settings,[string]$SessionId,$Session) {
-    $text=Invoke-MicrosoftRequest ('https://ov-df.microsoft.com/mdt.js?instanceId='+$Settings.Instance+'&pageId=si&session_id='+$SessionId) $Session
-    $w=[regex]::Match($text,'[?&]w=([A-Fa-f0-9]+)').Groups[1].Value
-    $ticks=[regex]::Match($text,'rticks\s*=\s*"?\+?(\d+)').Groups[1].Value
-    if(-not $w -or -not $ticks){throw 'No se pudo inicializar la sesion normal de Microsoft.'}
-    $reply='https://ov-df.microsoft.com/?session_id='+$SessionId+'&CustomerId='+$Settings.Instance+'&PageId=si&w='+$w+'&mdt='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()+'&rticks='+$ticks
-    $null=Invoke-MicrosoftRequest $reply $Session
-}
-function Select-MicrosoftX64Link($Data,[string]$Language,[string]$Id) {
-    $property=$Data.PSObject.Properties['ProductDownloadOptions']
-    if(-not $property){throw 'Microsoft no devolvio enlaces de descarga.'}
-    $options=@($property.Value|Where-Object { $_.DownloadType -eq 1 -and $_.Language -ceq $Language })
-    if($options.Count -ne 1){throw 'No hay un enlace x64 unico para el idioma seleccionado.'}
-    $u=Assert-MicrosoftUrl $options[0].Uri
-    $file=[IO.Path]::GetFileName($u.AbsolutePath)
-    $version=if($Id -eq 'windows10'){'10'}else{'11'}
-    if($file -notmatch ('(?i)^(?:Win|Windows)'+$version+'_.*\.iso$') -or $file -notmatch '(?i)_x64(?=[_.v])' -or $file -notmatch '^[A-Za-z0-9_.-]+$'){
-        throw ('La imagen devuelta no corresponde a Windows x64: '+$Id+' | '+$file)
-    }
-    return $options[0]
 }
 $script:RescusbHashCache=@{}
 function Get-RescusbCachedHash($File) {
@@ -203,60 +157,25 @@ function Get-RescusbMediaTool([string]$Id,[string]$StateFolder) {
     try {Assert-MicrosoftSignature $path} catch {Remove-Item -LiteralPath $path;throw}
     return $path
 }
+# Local ISO only: published hash first, then an ISO built by the Media Creation Tool.
+# Returns $null when the ISO still has to be created with the tool.
 function Resolve-MicrosoftIso($Item,[string]$StateFolder,[ValidateSet('Spanish','Spanish (Mexico)','English')][string]$Language='Spanish') {
-    # Published hash first (download or local copy). When Microsoft refuses the session,
-    # an ISO built with its Media Creation Tool is accepted by signature instead.
-    try {return (Resolve-MicrosoftOfficialIso $Item $StateFolder $Language)}
-    catch {
-        $official=$_
-        $local=Find-RescusbMediaToolWindows $Item $Language $StateFolder
-        if($local){return $local}
-        throw $official
-    }
-}
-function Resolve-MicrosoftOfficialIso($Item,[string]$StateFolder,[string]$Language) {
-    $session=New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    # Microsoft serves the ISO page to non-Windows clients, as documented on that page.
-    $session.UserAgent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36'
     $page='https://www.microsoft.com/en-us/software-download/'+$(if($Item.id -eq 'windows10'){'windows10ISO'}else{'windows11'})
-    $html=Invoke-MicrosoftRequest $page $session
-    $edition=Get-MicrosoftEdition $html $Item.id
-    $hash=Get-MicrosoftHash $html $Language
-    $local=Find-RescusbLocalWindows $Item.id $hash $Item.budgetBytes $StateFolder
-    if($local){
-        $copy=$Item|ConvertTo-Json|ConvertFrom-Json
-        $copy.sha256=$hash;$copy.source=$page;$copy.hashSource=$page
-        $copy.file=([IO.Path]::GetFileNameWithoutExtension($local))+'-'+$hash.Substring(0,8)+'.iso'
-        $copy.name=$(if($Item.id -eq 'windows10'){'Windows 10'}else{'Windows 11'})+' | '+$Language+' x64 | ISO local verificada'
-        $null=Assert-SafeDirectory $StateFolder
-        if(-not(Test-Path -LiteralPath $StateFolder)){$null=New-Item -ItemType Directory -Path $StateFolder}
-        Save-JsonAtomic ([ordered]@{sha256=$hash;source=$page;file=$copy.file;name=$copy.name;language=$Language}) (Join-Path $StateFolder ($Item.id+'.json'))
-        return [pscustomobject]@{Item=$copy;LocalPath=$local}
+    $hash=''
+    try {$hash=Get-MicrosoftHash (Invoke-MicrosoftRequest $page) $Language} catch {}
+    if($hash){
+        $local=Find-RescusbLocalWindows $Item.id $hash $Item.budgetBytes $StateFolder
+        if($local){
+            $copy=$Item|ConvertTo-Json|ConvertFrom-Json
+            $copy.sha256=$hash;$copy.source=$page;$copy.hashSource=$page
+            $copy.file=([IO.Path]::GetFileNameWithoutExtension($local))+'-'+$hash.Substring(0,8)+'.iso'
+            $copy.name=$(if($Item.id -eq 'windows10'){'Windows 10'}else{'Windows 11'})+' | '+$Language+' x64 | ISO oficial verificada por hash'
+            $null=Assert-SafeDirectory $StateFolder
+            if(-not(Test-Path -LiteralPath $StateFolder)){$null=New-Item -ItemType Directory -Path $StateFolder}
+            Save-JsonAtomic ([ordered]@{sha256=$hash;source=$page;file=$copy.file;name=$copy.name;language=$Language}) (Join-Path $StateFolder ($Item.id+'.json'))
+            return [pscustomobject]@{Item=$copy;LocalPath=$local}
+        }
     }
-    $settings=Get-MicrosoftClientSettings $html $session
-    $sessionId=[guid]::NewGuid().ToString()
-    Initialize-MicrosoftSession $settings $sessionId $session
-    $api='https://www.microsoft.com/software-download-connector/api/'
-    $query='?profile='+$settings.Profile+'&productEditionId='+$edition+'&SKU=undefined&friendlyFileName=undefined&Locale=en-US&sessionID='+$sessionId
-    $languages=Invoke-MicrosoftRequest ($api+'getskuinformationbyproductedition'+$query) $session -Json
-    $property=$languages.PSObject.Properties['Skus']
-    if(-not $property){throw 'Microsoft no devolvio idiomas.'}
-    $skus=@($property.Value|Where-Object Language -CEQ $Language)
-    if($skus.Count -ne 1 -or [string]$skus[0].Id -notmatch '^\d+$'){throw 'Idioma oficial no disponible o ambiguo.'}
-    $query='?profile='+$settings.Profile+'&productEditionId=undefined&SKU='+$skus[0].Id+'&friendlyFileName=undefined&Locale=en-US&sessionID='+$sessionId
-    $links=Invoke-MicrosoftRequest ($api+'GetProductDownloadLinksBySku'+$query) $session -Json
-    $link=Select-MicrosoftX64Link $links $Language $Item.id
-    $copy=$Item|ConvertTo-Json|ConvertFrom-Json
-    $copy.url=$link.Uri;$copy.sha256=$hash
-    # Version/content-specific filename keeps old completed and partial images intact.
-    $name=[IO.Path]::GetFileNameWithoutExtension(([uri]$link.Uri).AbsolutePath)
-    $copy.file=$name+'-'+$hash.Substring(0,8)+'.iso'
-    $copy.name=$link.ProductDisplayName+' | '+$Language+' x64'
-    $copy.source=$page;$copy.hashSource=$page
-    $null=Assert-SafeDirectory $StateFolder
-    if(-not(Test-Path -LiteralPath $StateFolder)){$null=New-Item -ItemType Directory -Path $StateFolder}
-    # Persist the identity and expected hash only. Fresh signed URLs stay in memory.
-    Save-JsonAtomic ([ordered]@{sha256=$hash;source=$page;file=$copy.file;name=$copy.name;language=$Language}) (Join-Path $StateFolder ($Item.id+'.json'))
-    return [pscustomobject]@{Item=$copy;LocalPath=''}
+    return (Find-RescusbMediaToolWindows $Item $Language $StateFolder)
 }
 Export-ModuleMember -Function *

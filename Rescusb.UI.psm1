@@ -107,7 +107,7 @@ function Get-RescusbPreparedPlan($Catalog,$Settings,[string]$StateFolder,[string
     foreach($item in @($Catalog.images|Where-Object {$_.id -in $Settings.images})){
         try {
             if($item.kind -eq 'windows'){
-                Write-Host ('  [...] Consultando Microsoft | '+$item.id) -ForegroundColor DarkGray
+                Write-Host ('  [...] Buscando la ISO de '+(Get-RescusbShortName $item.id)+' en Descargas e ISO-OFICIALES') -ForegroundColor DarkGray
                 $win=$null
                 if($ImageFolder){$win=Get-SavedWindowsItem $item $StateFolder $ImageFolder}
                 # Reuse an existing Windows file only in the language chosen by the user.
@@ -117,8 +117,13 @@ function Get-RescusbPreparedPlan($Catalog,$Settings,[string]$StateFolder,[string
                     if(-not $m.PSObject.Properties['language'] -or $m.language -cne $Settings.language){$win=$null}
                 }
                 if(-not $win){$win=Get-WindowsItem $item $StateFolder $Settings.language}
+                if(-not $win){
+                    # Not an error: Windows is always created with Microsoft's tool.
+                    Write-Host ('  [ ] '+(Get-RescusbShortName $item.id)+' | Se crea con la herramienta oficial de Microsoft.') -ForegroundColor Cyan
+                    continue
+                }
                 $items[$item.id]=$win
-                Write-Host ('  [OK] '+$win.Item.name+' | Enlace y SHA-256 oficiales') -ForegroundColor Green
+                Write-Host ('  [OK] '+$win.Item.name) -ForegroundColor Green
             } else {
                 Test-OfficialChecksum $item
                 $items[$item.id]=[pscustomobject]@{Item=$item;LocalPath=''}
@@ -139,8 +144,18 @@ function Assert-RescusbPlanComplete($Plan,$Selected) {
 function Get-RescusbShortName([string]$Id) {
     switch($Id){'systemrescue'{'SystemRescue'} 'memtest'{'Memtest86+'} 'hirens'{"Hiren's BootCD PE"} 'rescuezilla'{'Rescuezilla'} 'ubuntu'{'Ubuntu Live'} 'windows11'{'Windows 11'} 'windows10'{'Windows 10'} default{$Id}}
 }
+# Windows is created with Microsoft's tool while preparing, so it never blocks a source check.
+function Get-RescusbCheckedImages($Plan,$Selected) {
+    return @($Selected|Where-Object {$Plan.Items.ContainsKey($_) -or $_ -notin @('windows11','windows10')})
+}
 function Write-RescusbSourceHint($Plan,$Selected) {
-    $missing=@($Selected|Where-Object {-not $Plan.Items.ContainsKey($_)})
+    $windows=@($Selected|Where-Object {$_ -in @('windows11','windows10') -and -not $Plan.Items.ContainsKey($_)})
+    $missing=@($Selected|Where-Object {-not $Plan.Items.ContainsKey($_) -and $_ -notin $windows})
+    if($windows.Count){
+        Write-Host ''
+        Write-Host '  Windows se crea con la herramienta oficial de Microsoft al armar el' -ForegroundColor Gray
+        Write-Host '  pendrive. Suma de 20 minutos a más de una hora según tu conexión.' -ForegroundColor Gray
+    }
     if($missing.Count -eq 0 -or @($Plan.Errors|Where-Object id -eq 'ventoy').Count){return}
     Write-Host ''
     Write-Host ('  Falta: '+(@($missing|ForEach-Object {Get-RescusbShortName $_}) -join ', ')+'.') -ForegroundColor Yellow
@@ -167,7 +182,8 @@ function Invoke-RescusbMediaTool([string]$Id,[string]$StateFolder,[string]$Langu
     Write-Host '  3. Elegí «Archivo ISO». NO elijas «Unidad flash USB»: borraría el pendrive.' -ForegroundColor Yellow
     Write-Host '  4. Guardala en Descargas y esperá a que termine. Después cerrá la herramienta.'
     Write-Host ''
-    Write-Host '  RESCUSB espera acá y después la comprueba sola.' -ForegroundColor Gray
+    Write-Host '  Tarda de 20 minutos a más de una hora. RESCUSB espera acá y después' -ForegroundColor Gray
+    Write-Host '  comprueba la ISO sola: no cierres esta ventana.' -ForegroundColor Gray
     $process=Start-Process -FilePath $tool -PassThru
     $process.WaitForExit()
 }
@@ -178,37 +194,43 @@ function Resolve-RescusbPlanGaps($Plan,$Selected,[string]$StateFolder='',[string
     $available=@($Selected|Where-Object {$Plan.Items.ContainsKey($_)})
     if($ventoyFailed -or $available.Count -eq 0){Assert-RescusbPlanComplete $Plan $Selected}
     $windows=@($missing|Where-Object {$_ -in @('windows11','windows10')})
+    $others=@($missing|Where-Object {$_ -notin $windows})
     Write-Host ''
-    Write-Host ('  [!] '+$available.Count+' de '+$Selected.Count+' herramientas están listas para descargar.') -ForegroundColor Yellow
-    Write-Host ('      Falta: '+(@($missing|ForEach-Object {Get-RescusbShortName $_}) -join ', ')+'.') -ForegroundColor Yellow
     if($windows.Count){
-        Write-Host '      Microsoft no entregó el enlace automático de Windows. Su herramienta' -ForegroundColor Gray
-        Write-Host '      oficial puede generar la ISO, y RESCUSB la acepta si el instalador' -ForegroundColor Gray
-        Write-Host '      está firmado por Microsoft y es x64 en el idioma elegido.' -ForegroundColor Gray
+        $names=@($windows|ForEach-Object {Get-RescusbShortName $_}) -join ' y '
+        Write-Host ('  '+$names.ToUpper()+' SE CREA CON LA HERRAMIENTA OFICIAL DE MICROSOFT') -ForegroundColor Cyan
+        Write-Host '  Microsoft no ofrece la ISO de Windows por descarga directa. RESCUSB baja' -ForegroundColor Gray
+        Write-Host '  su herramienta oficial, la abre y después verifica la ISO que genera.' -ForegroundColor Gray
+        Write-Host '  Tarda de 20 minutos a más de una hora según tu conexión (unos 7 GB).' -ForegroundColor Yellow
+        Write-Host '  Podés seguir usando la PC mientras tanto.' -ForegroundColor Gray
     }
-    Write-Host '      Todavía no se borró ni se modificó el pendrive.' -ForegroundColor Gray
+    if($others.Count){
+        Write-Host ('  [!] No respondió: '+(@($others|ForEach-Object {Get-RescusbShortName $_}) -join ', ')+'.') -ForegroundColor Yellow
+    }
+    Write-Host '  Todavía no se borró ni se modificó el pendrive.' -ForegroundColor Gray
     Write-Host ''
-    Write-Host ('  [1] Preparar ahora las '+$available.Count+' disponibles') -ForegroundColor Cyan
+    if($windows.Count){
+        Write-Host '  [1] Crear la ISO de Windows ahora (recomendado)' -ForegroundColor Cyan
+        Write-Host '      Enter también elige esta opción.' -ForegroundColor Gray
+    }
+    Write-Host ('  [2] Preparar ahora las '+$available.Count+' herramientas listas') -ForegroundColor White
     Write-Host '      Lo que falta queda pendiente. Se agrega después con «Continuar».' -ForegroundColor Gray
-    if($windows.Count){
-        Write-Host '  [2] Crear la ISO con la herramienta oficial de Microsoft' -ForegroundColor White
-        Write-Host '      RESCUSB la descarga, comprueba su firma y te guía. Tarda un rato.' -ForegroundColor Gray
-    }
-    Write-Host '  [3] Volver a comprobar las fuentes' -ForegroundColor White
+    if($others.Count){Write-Host '  [3] Volver a comprobar las fuentes' -ForegroundColor White}
     Write-Host '  [0] Volver al menú sin tocar el pendrive' -ForegroundColor DarkGray
     while($true){
         $answer=([string](Read-Host '  ¿Cómo seguimos?')).Trim()
+        if(-not $answer -and $windows.Count){$answer='1'}
         switch($answer){
-            '1' {return ,$available}
-            {$_ -eq '2' -and $windows.Count} {
+            {$_ -eq '1' -and $windows.Count} {
                 try {
                     foreach($id in $windows){Invoke-RescusbMediaTool $id $StateFolder $Language}
                     return 'retry'
                 } catch {Write-Host ('  [!] '+$_.Exception.Message) -ForegroundColor Yellow}
             }
-            '3' {return 'retry'}
+            '2' {return ,$available}
+            {$_ -eq '3' -and $others.Count} {return 'retry'}
             '0' {throw [OperationCanceledException]::new('Todavía falta una fuente oficial. No se borró ni preparó el pendrive.')}
-            default {Write-Host '  Elegí 1, 2, 3 o 0.' -ForegroundColor Yellow}
+            default {Write-Host '  Elegí una de las opciones mostradas.' -ForegroundColor Yellow}
         }
     }
 }
@@ -295,6 +317,7 @@ function Show-RescusbHelp($Catalog) {
     Write-Host '  No se exige desconectarlo: su identidad se vuelve a comprobar automáticamente.' -ForegroundColor Gray
     Write-Host '  Windows se prepara en español y x64 por defecto. El idioma se cambia en Ajustes.' -ForegroundColor Gray
     Write-Host '  Windows 10 ya no tiene soporte de Microsoft: se agrega desde Ajustes.' -ForegroundColor Gray
+    Write-Host '  Windows se crea con la herramienta oficial de Microsoft: suma 20-60 minutos.' -ForegroundColor Gray
     Write-Host '  Las ISO de Windows permiten reparar o instalar; no son un Windows portátil.' -ForegroundColor Gray
     Write-Host '  Secure Boot y el arranque de cada imagen dependen del firmware y del equipo.' -ForegroundColor Gray
     Write-Host '  No se cambian claves del firmware, licencias ni opciones del BIOS.' -ForegroundColor Gray

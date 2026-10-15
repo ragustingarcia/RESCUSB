@@ -12,7 +12,7 @@ RESCUSB convierte un pendrive de 64 GB en una caja de herramientas de rescate: i
 2. Conectá el pendrive y abrí **INICIAR.bat**. Aceptá el permiso de administrador de Windows si aparece.
 3. Elegí **Armar mi pendrive completo**. La opción predeterminada incluye seis herramientas; Windows 10 se agrega desde **Ajustes** porque ya no tiene soporte de Microsoft.
 4. Elegí tu pendrive en la lista. Los discos internos y los discos USB fijos no se ofrecen. **Dejalo conectado** durante todo el proceso.
-5. RESCUSB comprueba las fuentes oficiales y obtiene automáticamente los enlaces y SHA-256 de Windows. Todavía no se borra el USB. Si alguna fuente no responde, podés preparar ahora lo disponible y agregar el resto después con **Continuar**.
+5. RESCUSB comprueba las fuentes oficiales. Para Windows abre la herramienta oficial de Microsoft y te guía para crear la ISO: **tarda de 20 minutos a más de una hora**. Todavía no se borra el USB. Si preferís, preparás ahora lo demás y agregás Windows después con **Continuar**.
 6. Revisá el modelo, la capacidad, la unidad y la serie. Para autorizar el borrado, escribí **BORRAR seguido de la serie** que muestra el programa.
 7. Esperá mientras se instala Ventoy y se descargan/verifican las imágenes directamente en el USB. Si se interrumpe, elegí **Continuar** la próxima vez.
 8. Cuando aparezca **LISTO**, expulsá el pendrive desde Windows. Al reiniciar el equipo, elegilo desde el menú de arranque.
@@ -25,7 +25,7 @@ La preparación elimina todas las particiones y archivos del pendrive elegido. L
 |---|---|
 | **Armar mi pendrive completo** | Primera preparación. Comprueba fuentes, solicita confirmación, instala Ventoy y prepara el contenido. |
 | **Continuar o completar mi pendrive** | Reconoce un USB creado por este programa, conserva Ventoy y retoma/completa descargas. |
-| **Comprobar que todo esté disponible** | Consulta el USB y las fuentes, incluidos los enlaces y hashes de Windows. No borra ni instala. |
+| **Comprobar que todo esté disponible** | Consulta el USB y las fuentes, y busca una ISO de Windows ya creada. No borra ni instala. |
 | **Ajustes y contenido** | Cambia el idioma de Windows o elige herramientas con números. Todas vienen seleccionadas por defecto. |
 | **Qué hace RESCUSB** | Explica las herramientas y cómo arrancar el pendrive, dentro de la misma terminal. |
 
@@ -47,25 +47,21 @@ Windows viene configurado en **español y x64**. En Ajustes podés elegir españ
 
 Windows 10 dejó de recibir soporte de Microsoft el 14/10/2025. Sigue disponible en **Ajustes → Elegir herramientas**, pero no viene marcado por defecto.
 
-## Windows automático y fuentes oficiales
+## Windows con la herramienta oficial de Microsoft
 
-RESCUSB lee la página pública de Microsoft, descubre la edición vigente, el idioma y su hash publicado, inicializa una sesión normal de descarga y solicita un enlace nuevo. **No hace falta pegar enlaces ni escribir hashes.** Los enlaces firmados quedan en memoria, no en el programa, el ZIP ni los informes. No se ejecuta JavaScript remoto, Fido, Rufus ni código descargado para generar esos enlaces.
+Microsoft no ofrece la ISO de Windows por descarga directa a programas: a un navegador de Windows lo manda a su **herramienta de creación de medios**. RESCUSB usa siempre ese camino oficial y **avisa antes que tarda de 20 minutos a más de una hora** según la conexión (la herramienta descarga unos 7 GB). El pendrive no se toca mientras tanto.
 
-El flujo de la página de Microsoft puede cambiar y el servicio puede rechazar solicitudes o no estar disponible. RESCUSB respeta ese rechazo y detiene la preparación antes del borrado. No cambia de IP, no resuelve desafíos ni usa copias de terceros. Una comprobación de metadatos correcta tampoco obliga al servidor a mantener disponible la descarga durante horas; si falla después, el parcial se conserva para Continuar.
+1. Antes de borrar nada, RESCUSB busca una ISO de Windows ya creada en **Descargas** e **ISO-OFICIALES**. Si encuentra una válida, la usa y se saltea la herramienta.
+2. Si no hay, ofrece **Crear la ISO de Windows ahora** (también con Enter). Descarga la herramienta de `go.microsoft.com` y solo la abre si tiene firma digital válida de Microsoft Corporation.
+3. Te guía en la herramienta: idioma, x64 y **Archivo ISO** guardado en Descargas. Nunca hay que elegir «Unidad flash USB», que borraría el pendrive.
+4. Cuando la cerrás, RESCUSB monta la ISO en solo lectura y comprueba dos cosas:
+   - que `setup.exe` y `sources\setup.exe` tengan firma válida de Microsoft;
+   - con DISM, que la imagen sea x64, del idioma elegido y de la versión correcta (Windows 11 = compilación 22000 o posterior).
+5. La copia al pendrive verificando su SHA-256 propio. El informe la marca como **verificada por firma**.
 
-También busca automáticamente ISO de Windows en **ISO-OFICIALES** junto al programa y en la carpeta **Downloads/Descargas** habitual del perfil. Solo revisa archivos ISO de Windows en esas carpetas, sin recorrer subcarpetas ni modificar los originales. Usa una copia local únicamente si coincide con el **SHA-256 oficial actual del idioma elegido** y tiene formato ISO válido. Así puede reutilizar una descarga oficial existente.
+Si en Descargas hay una ISO que coincide con el **SHA-256 publicado por Microsoft** para el idioma elegido, se prefiere esa: es la verificación más fuerte. La firma confirma que el instalador es de Microsoft, pero no cada byte de la imagen. RESCUSB no pide enlaces de descarga a los servicios internos de Microsoft ni intenta eludir sus restricciones.
 
-### Si Microsoft rechaza la descarga automática
-
-Microsoft puede negar el enlace automático a una conexión y, en un navegador de Windows, ofrecer solo su **herramienta de creación de medios**. La ISO que genera esa herramienta no tiene un hash publicado con qué compararla. En ese caso, la opción **Crear la ISO con la herramienta oficial de Microsoft**:
-
-1. descarga la herramienta de `go.microsoft.com` y solo la abre si tiene firma digital válida de Microsoft Corporation;
-2. te guía: idioma, x64 y **Archivo ISO** guardado en Descargas (nunca «Unidad flash USB», que borraría el pendrive);
-3. cuando la cerrás, busca la ISO (`Windows*.iso`) y la monta en solo lectura. Comprueba que `setup.exe` y `sources\setup.exe` tengan firma válida de Microsoft y, con DISM, que la imagen sea x64, del idioma elegido y de la versión correcta (Windows 11 = compilación 22000 o posterior);
-4. la copia al pendrive verificando su SHA-256 propio y el informe la marca como **verificada por firma, sin hash publicado**.
-
-Es una verificación más débil que el hash oficial: confirma que el instalador es de Microsoft, pero no cada byte de la imagen. Por eso RESCUSB siempre intenta primero el hash publicado.
-
+También podés elegir **Preparar ahora las herramientas listas** y agregar Windows después con **Continuar**.
 Los otros proyectos usan versiones fijadas en `catalogo.json`, publicadas y verificadas por sus fuentes oficiales. Sus hashes se contrastan otra vez durante la comprobación. Un cambio de versión/hash no se acepta silenciosamente. Ver [FUENTES.md](FUENTES.md).
 
 ## Requisitos y espacio
@@ -92,7 +88,7 @@ En el pendrive quedan **ISO**, el identificador de dispositivo, **informe-rescat
 |---|---|
 | Otra sesión abierta | Cerrá las ventanas de versiones anteriores y volvé a abrir INICIAR.bat. No cierres un instalador que esté trabajando. |
 | El pendrive no aparece | Debe ser USB extraíble, tener identidad fiable, estado saludable y capacidad compatible. No hay una opción para forzar discos internos o USB fijos. |
-| Microsoft rechaza la sesión | No se borra el USB durante la comprobación. RESCUSB ofrece tres caminos: **preparar ahora** las herramientas disponibles y dejar Windows pendiente para **Continuar**; **crear la ISO con la herramienta oficial de Microsoft**, que RESCUSB descarga, verifica y abre; o **volver a comprobar** más tarde. Ver [Si Microsoft rechaza la descarga automática](#si-microsoft-rechaza-la-descarga-automática). |
+| La ISO de Windows no se acepta | Debajo de «Comprobando la firma de Microsoft» aparece el motivo: idioma, arquitectura, versión o firma. Volvé a crearla con la herramienta eligiendo el idioma de Ajustes y x64, como **Archivo ISO** en Descargas. Ver [Windows con la herramienta oficial de Microsoft](#windows-con-la-herramienta-oficial-de-microsoft). |
 | Descarga interrumpida | Conservá los .part y elegí Continuar. |
 | Servidor sin soporte Range / curl 33 o 416 | Revisá el nombre del parcial afectado. Si decidís empezar de cero, renombrá solo ese .part a una extensión distinta y reintentá. Seguirá ocupando espacio hasta que lo retires. |
 | Hash incorrecto | Un archivo completo que falla la verificación, sea .part o ISO final, se conserva con extensión .invalid-…part. Continuar puede iniciar una descarga limpia sin reutilizar ese archivo. La cuarentena sigue ocupando espacio. Revisá el informe y el USB si vuelve a ocurrir. |
@@ -117,7 +113,7 @@ La CLI de Ventoy necesita un número de disco físico y no ofrece un bloqueo de 
 ## Diagnóstico y pruebas
 
 - **INICIAR.bat /diagnostico**: programa, rutas, OneDrive, estado y pendrives; sin red ni instalación.
-- **INICIAR.bat /fuentes**: fuentes y enlaces/hashes automáticos de Windows; no descarga ISO ni instala Ventoy.
+- **INICIAR.bat /fuentes**: fuentes oficiales y búsqueda de una ISO de Windows ya creada; no descarga ISO ni instala Ventoy.
 - **INICIAR.bat /vista**: muestra el menú sin consultar dispositivos ni elevar permisos.
 - **PRUEBAS.bat**: pruebas de seguridad y del flujo completo con archivos pequeños, proveedores y dispositivos simulados. No necesita Internet ni ejecuta el instalador real. Puede mostrar mensajes de confirmación de un USB ficticio.
 - [VALIDACION.md](VALIDACION.md): resultados y alcance real de las pruebas.
@@ -140,7 +136,7 @@ RESCUSB **no incluye ni redistribuye** ninguna de estas herramientas: las descar
 | [Hiren's BootCD PE](https://www.hirensbootcd.org/) | Hiren's BootCD PE | Distribución gratuita basada en Windows PE de Microsoft, sujeta a sus condiciones (entre ellas, el límite de 72 h de uso continuo); las utilidades incluidas conservan sus licencias | Descarga la ISO oficial. |
 | [Rescuezilla](https://rescuezilla.com/) | Proyecto Rescuezilla | [GPL-3.0](https://github.com/rescuezilla/rescuezilla/blob/master/LICENSE) | Descarga la ISO oficial. |
 | [Ubuntu Desktop](https://ubuntu.com/) | Canonical Ltd. | Software libre, mayormente GPL; marca sujeta a la [política de propiedad intelectual de Canonical](https://ubuntu.com/legal/intellectual-property-policy) | Descarga la ISO oficial. |
-| [Windows 10 y 11](https://www.microsoft.com/software-download/) | Microsoft Corporation | [Términos de licencia de Microsoft](https://www.microsoft.com/useterms); activar Windows requiere una licencia válida | Obtiene el enlace temporal de la página oficial de Microsoft, usa una ISO oficial que ya tengas o abre la herramienta de creación de medios de Microsoft (firmada) para que generes la ISO. |
+| [Windows 10 y 11](https://www.microsoft.com/software-download/) | Microsoft Corporation | [Términos de licencia de Microsoft](https://www.microsoft.com/useterms); activar Windows requiere una licencia válida | Abre la herramienta de creación de medios de Microsoft (verificada por su firma) para que generes la ISO, o usa una ISO oficial que ya tengas. |
 
 También usa programas que vienen con Windows: PowerShell 5.1, `curl.exe` y Robocopy. No los incluye ni los modifica.
 

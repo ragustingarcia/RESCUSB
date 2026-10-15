@@ -18,73 +18,52 @@ $ms=Get-Module Rescusb.Microsoft;$ui=Get-Module Rescusb.UI
 $catalog=Get-Content -LiteralPath (Join-Path $base 'catalogo.json') -Raw|ConvertFrom-Json
 try{
     $hash='a'*64
-    $html='<select id="product-edition"><option value="null">Choose</option><option value="2618">Windows 10 (multi-edition ISO)</option><option value="3813">Windows 11 (multi-edition ISO for x64 devices)</option></select><table><tr><td>Spanish 32-bit</td><td>'+('b'*64)+'</td></tr><tr><td>Spanish 64-bit</td><td>'+$hash+'</td></tr><tr><td>Spanish (Mexico) 64-bit</td><td>'+('c'*64)+'</td></tr></table><script src="/foxtrot/etc.clientlibs/sds/components/content/sdsbase/v1/clientlibs/site.FIXTURE.min.js"></script>'
-    Check 'Microsoft edition discovered dynamically, never guessed' {Equal (Get-MicrosoftEdition $html 'windows10') '2618';Equal (Get-MicrosoftEdition $html 'windows11') '3813';Reject {Get-MicrosoftEdition '<select id="product-edition"><option value="1">Windows 11</option><option value="2">Windows 11</option></select>' 'windows11'}}
+    $html='<table><tr><td>Spanish 32-bit</td><td>'+('b'*64)+'</td></tr><tr><td>Spanish 64-bit</td><td>'+$hash+'</td></tr><tr><td>Spanish (Mexico) 64-bit</td><td>'+('c'*64)+'</td></tr></table>'
     Check 'Microsoft SHA bound to exact language and x64' {Equal (Get-MicrosoftHash $html 'Spanish') $hash;Equal (Get-MicrosoftHash $html 'Spanish (Mexico)') ('c'*64);Reject {Get-MicrosoftHash $html 'English'}}
     Check 'conflicting official checksums stop selection' {Reject {Get-MicrosoftHash ($html+'<tr><td>Spanish 64-bit</td><td>'+('d'*64)+'</td></tr>') 'Spanish'}}
-    $links=[pscustomobject]@{ProductDownloadOptions=@([pscustomobject]@{DownloadType=0;Language='Spanish';Uri='https://software.download.prss.microsoft.com/Win11_Spanish_x32.iso'},[pscustomobject]@{DownloadType=1;Language='Spanish';Uri='https://software.download.prss.microsoft.com/Windows11_Client_x64_es-es_12345_9876.iso';ProductDisplayName='Windows 11 Test'})}
-    Check 'current and previous Microsoft ISO filenames supported with version and arch checks' {
-        $chosen=Select-MicrosoftX64Link $links 'Spanish' 'windows11';Equal $chosen.DownloadType 1
-        $old=$links|ConvertTo-Json -Depth 8|ConvertFrom-Json;$old.ProductDownloadOptions[1].Uri='https://software.download.prss.microsoft.com/Win11_25H2_Spanish_x64.iso'
-        $null=Select-MicrosoftX64Link $old 'Spanish' 'windows11';Reject {Select-MicrosoftX64Link $links 'Spanish' 'windows10'}
-    }
-    Check 'no architecture or language substitution' {Reject {Select-MicrosoftX64Link $links 'English' 'windows11'};$bad=$links|ConvertTo-Json -Depth 8|ConvertFrom-Json;$bad.ProductDownloadOptions[1].Uri='https://software.download.prss.microsoft.com/Win11_Spanish_arm64.iso';Reject {Select-MicrosoftX64Link $bad 'Spanish' 'windows11'}}
-    Check 'Microsoft lookalike hosts and duplicate links rejected' {
-        $bad=$links|ConvertTo-Json -Depth 8|ConvertFrom-Json;$bad.ProductDownloadOptions[1].Uri='https://software.download.prss.microsoft.com.evil.org/Win11_Spanish_x64.iso';Reject {Select-MicrosoftX64Link $bad 'Spanish' 'windows11'}
-        $duplicate=[pscustomobject]@{ProductDownloadOptions=@($links.ProductDownloadOptions[1],$links.ProductDownloadOptions[1])};Reject {Select-MicrosoftX64Link $duplicate 'Spanish' 'windows11'}
-    }
+    $isoBytes=New-Object byte[] 40960;[Text.Encoding]::ASCII.GetBytes('CD001').CopyTo($isoBytes,32769)
+    $toolFolder=Join-Path $temp 'tool-iso';$null=New-Item -ItemType Directory -Path $toolFolder;[IO.File]::WriteAllBytes((Join-Path $toolFolder 'Windows.iso'),$isoBytes)
     & $ms {
         param($html)
-        $script:FixtureHtml=$html;$script:Calls=@();$script:RejectLinks=$false;$script:HttpFailure=$false
-        function script:Find-RescusbLocalWindows {param($Id,$Hash,$Maximum,$StateFolder);return ''}
+        $script:FixtureHtml=$html;$script:Calls=@();$script:HttpFailure=$false;$script:LocalOfficial=''
+        function script:Find-RescusbLocalWindows {param($Id,$Hash,$Maximum,$StateFolder);return $script:LocalOfficial}
         # Mounting an ISO and DISM need a real Windows image: the signature check is simulated.
         $script:IsoFolders=@();$script:Tested=@()
         function script:Get-RescusbIsoFolders {param($StateFolder);return $script:IsoFolders}
         function script:Test-RescusbMediaToolIso {param($Path,$Id,$Language);$script:Tested+=[IO.Path]::GetFileName($Path)}
         function script:Invoke-WebRequest {
-            param($Uri,$WebSession,$Headers,[switch]$UseBasicParsing,$MaximumRedirection,$TimeoutSec)
+            param($Uri,$UserAgent,[switch]$UseBasicParsing,$MaximumRedirection,$TimeoutSec)
             $script:Calls+=[string]$Uri
             if($script:HttpFailure){throw 'Network unavailable'}
-            if($Uri -match '/software-download/windows(?:11|10ISO)$'){$text=$script:FixtureHtml;$script:FixtureVersion=$(if($Uri -match 'windows10ISO$'){'10'}else{'11'})}
-            elseif($Uri -match 'site\.FIXTURE\.min\.js$'){$text='profile\x3d606624d44113;instanceId\x3d560dc9f3-1aa5-4a2f-b63c-9e18f8d0e175'}
-            elseif($Uri -match '/mdt\.js\?'){$text='?w=ABCDEF;rticks="123456789"'}
-            elseif($Uri -match 'ov-df.microsoft.com/\?'){$text='OK'}
-            elseif($Uri -match 'getskuinformationbyproductedition'){$text='{"Skus":[{"Id":"123","Language":"Spanish"}]}'}
-            elseif($Uri -match 'GetProductDownloadLinksBySku'){
-                if($script:RejectLinks){$text='{"Errors":[{"Key":"ErrorSettings.SentinelReject","Type":8}]}'}
-                else{$text='{"ProductDownloadOptions":[{"DownloadType":1,"Language":"Spanish","Uri":"https://software.download.prss.microsoft.com/Windows'+$script:FixtureVersion+'_Client_x64_es-es_12345_9876.iso?token=PRIVATE_SAMPLE","ProductDisplayName":"Windows '+$script:FixtureVersion+' Test"}],"Errors":null}'}
-            }else{throw 'Unexpected network request'}
-            $bytes=[Text.Encoding]::UTF8.GetBytes($text);$stream=New-Object IO.MemoryStream;$stream.Write($bytes,0,$bytes.Length);$stream.Position=0
+            if($Uri -notmatch '/software-download/windows(?:11|10ISO)$'){throw 'Unexpected network request'}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($script:FixtureHtml);$stream=New-Object IO.MemoryStream;$stream.Write($bytes,0,$bytes.Length);$stream.Position=0
             return [pscustomobject]@{StatusCode=200;RawContentStream=$stream}
         }
     } $html
-    Check 'automatic Microsoft flow queries only first-party endpoints and persists no signed URL' {
-        $state=Join-Path $temp 'microsoft';$item=$catalog.images|Where-Object id -eq 'windows11'
-        $resolved=Resolve-MicrosoftIso $item $state 'Spanish'
-        Equal $resolved.Item.sha256 $hash
-        if($resolved.Item.file -notmatch '-aaaaaaaa\.iso$'){throw 'No content-specific filename'}
-        $saved=Get-Content -LiteralPath (Join-Path $state 'windows11.json') -Raw
-        if($saved -match 'PRIVATE_SAMPLE|token=|software.download.prss'){throw 'Se guardo un enlace firmado'}
-        $calls=& $ms {$script:Calls};Equal @($calls).Count 6
-        foreach($url in $calls){if(([uri]$url).DnsSafeHost -notin @('www.microsoft.com','ov-df.microsoft.com')){throw 'Third party endpoint'}}
+    $win11=$catalog.images|Where-Object id -eq 'windows11'
+    Check 'Windows lookup only reads Microsoft public page and never requests a download link' {
+        & $ms {$script:Calls=@()}
+        Equal (Resolve-MicrosoftIso $win11 (Join-Path $temp 'none') 'Spanish') $null
+        $calls=@(& $ms {$script:Calls});Equal $calls.Count 1
+        Equal ([uri]$calls[0]).DnsSafeHost 'www.microsoft.com'
     }
-    Check 'service refusal respected, no Windows metadata created' {
-        & $ms {$script:RejectLinks=$true};$state=Join-Path $temp 'rejected'
-        Reject {Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows11') $state} 'no autorizo'
-        Equal (Test-Path -LiteralPath (Join-Path $state 'windows11.json')) $false
-        & $ms {$script:RejectLinks=$false}
+    Check 'ISO matching the published hash is preferred over the tool' {
+        & $ms {param($f);$script:LocalOfficial=(Join-Path $f 'Windows.iso');$script:IsoFolders=@($f)} $toolFolder
+        $resolved=Resolve-MicrosoftIso $win11 (Join-Path $temp 'official') 'Spanish'
+        Equal $resolved.Item.sha256 $hash;Equal ($null -eq $resolved.Item.PSObject.Properties['verification']) $true
+        & $ms {$script:LocalOfficial='';$script:IsoFolders=@()}
     }
-    Check 'refused session falls back to a Media Creation Tool ISO verified by signature' {
-        $f=Join-Path $temp 'fallback-iso';$null=New-Item -ItemType Directory -Path $f
-        $bytes=New-Object byte[] 40960;[Text.Encoding]::ASCII.GetBytes('CD001').CopyTo($bytes,32769);[IO.File]::WriteAllBytes((Join-Path $f 'Windows.iso'),$bytes)
-        & $ms {param($f);$script:RejectLinks=$true;$script:IsoFolders=@($f)} $f
-        $resolved=Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows11') (Join-Path $temp 'fallback')
-        Equal $resolved.LocalPath (Join-Path $f 'Windows.iso');Equal $resolved.Item.verification 'firma'
+    Check 'Media Creation Tool ISO accepted by signature when there is no official ISO' {
+        & $ms {param($f);$script:IsoFolders=@($f)} $toolFolder
+        $resolved=Resolve-MicrosoftIso $win11 (Join-Path $temp 'tool') 'Spanish'
+        Equal $resolved.LocalPath (Join-Path $toolFolder 'Windows.iso');Equal $resolved.Item.verification 'firma'
         & $ms {$script:IsoFolders=@()}
-        Reject {Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows11') (Join-Path $temp 'fallback-none')} 'no autorizo'
-        & $ms {$script:RejectLinks=$false}
     }
-    Check 'Microsoft signature required: system binary accepted, unsigned file rejected' {
+    Check 'without Internet a signed tool ISO is still found' {
+        & $ms {param($f);$script:HttpFailure=$true;$script:IsoFolders=@($f)} $toolFolder
+        Equal (Resolve-MicrosoftIso $win11 (Join-Path $temp 'offline') 'Spanish').Item.verification 'firma'
+        & $ms {$script:HttpFailure=$false;$script:IsoFolders=@()}
+    }    Check 'Microsoft signature required: system binary accepted, unsigned file rejected' {
         Assert-MicrosoftSignature (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe')
         $unsigned=Join-Path $temp 'setup.exe';[IO.File]::WriteAllBytes($unsigned,[byte[]](77,90,0,0));Reject {Assert-MicrosoftSignature $unsigned} 'firma'
     }
@@ -109,16 +88,6 @@ try{
         Equal $found.Item.file ('windows11-herramienta-es-ES-'+$h.Substring(0,8)+'.iso')
         Equal (Get-Content -LiteralPath (Join-Path $state 'windows11.json') -Raw|ConvertFrom-Json).verification 'firma'
     }
-    Check 'Windows 10 automatic resolution uses its own edition and version identity' {
-        $resolved=Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows10') (Join-Path $temp 'microsoft10') 'Spanish'
-        if($resolved.Item.file -notmatch '^Windows10_'){throw 'Se devolvio otra version de Windows'}
-        Equal $resolved.Item.sha256 $hash
-    }
-    Check 'network failure terminates automatic resolution without fallback host' {
-        & $ms {$script:HttpFailure=$true}
-        Reject {Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows11') (Join-Path $temp 'offline')} 'No se pudo consultar'
-        & $ms {$script:HttpFailure=$false}
-    }
     Check 'local official ISO accepted only by official SHA and structure' {
         $f=Join-Path $temp 'local';$null=New-Item -ItemType Directory -Path $f
         $p=Join-Path $f 'Win11_Local_x64.iso';$bytes=New-Object byte[] 40960;[Text.Encoding]::ASCII.GetBytes('CD001').CopyTo($bytes,32769);[IO.File]::WriteAllBytes($p,$bytes)
@@ -135,7 +104,7 @@ try{
         function script:Get-SavedWindowsItem {param($Item,$StateFolder,$Folder);return $null}
         function script:Get-WindowsItem {
             param($Item,$StateFolder,$Language)
-            if($script:FailMicrosoft){throw 'Microsoft rejected the session'}
+            if($script:FailMicrosoft){return $null}
             $copy=$Item|ConvertTo-Json|ConvertFrom-Json;$copy.sha256='a'*64;$copy.url='https://software.download.prss.microsoft.com/Win11_Test_x64.iso'
             return [pscustomobject]@{Item=$copy;LocalPath=''}
         }
@@ -143,19 +112,21 @@ try{
         function script:Install-Ventoy {param($Target,$Item,$StateFolder);$script:Installs++;return [pscustomobject]@{Target=$Target;Root=$script:JobRoot}}
         function script:Invoke-ImagePlan {param($Catalog,$Target,$Root,$Selected,$StateFolder,$Prepared);$script:ImageRuns++;$script:PreparedCount=$Prepared.Count;$script:SelectedCount=@($Selected).Count;return $script:ImageFailures}
         function script:Read-Host {param($Prompt);$script:GapPrompts++;return $script:GapAnswer}
+        $script:ToolRuns=0
+        function script:Invoke-RescusbMediaTool {param($Id,$StateFolder,$Language);$script:ToolRuns++;$script:FailMicrosoft=$false}
         function script:Get-UsbRoot {param($Target);return $script:JobRoot}
     }
     $settings=[pscustomobject]@{schema=1;language='Spanish';images=@($catalog.images.id)}
-    Check 'failed Windows preflight never invokes installer or USB writes' {
+    Check 'cancelling while Windows is still to be created never invokes installer or USB writes' {
         $job=Join-Path $temp 'blocked-job';$null=New-Item -ItemType Directory -Path $job
         & $ui {param($r);$script:JobRoot=$r;$script:FailMicrosoft=$true;$script:Installs=0;$script:ImageRuns=0} $job
         Reject {Start-RescusbJob $catalog $settings (FakeDisk) $temp} 'fuente oficial'
         Equal (& $ui {$script:Installs}) 0;Equal (& $ui {$script:ImageRuns}) 0
         Equal @(Get-ChildItem -LiteralPath $job -File).Count 0
     }
-    Check 'unavailable Windows can be left pending: five tools prepared, never marked ready' {
+    Check 'Windows can be left pending: five tools prepared, never marked ready' {
         $job=Join-Path $temp 'pending-job';$null=New-Item -ItemType Directory -Path $job
-        & $ui {param($r);$script:JobRoot=$r;$script:FailMicrosoft=$true;$script:Installs=0;$script:ImageRuns=0;$script:ImageFailures=0;$script:GapAnswer='1'} $job
+        & $ui {param($r);$script:JobRoot=$r;$script:FailMicrosoft=$true;$script:Installs=0;$script:ImageRuns=0;$script:ImageFailures=0;$script:GapAnswer='2'} $job
         Equal (Start-RescusbJob $catalog $settings (FakeDisk) $temp) 2
         Equal (& $ui {$script:Installs}) 1;Equal (& $ui {$script:SelectedCount}) 5
         $status=Get-Content -LiteralPath (Join-Path $job 'RESCUSB-ESTADO.json') -Raw|ConvertFrom-Json
@@ -169,6 +140,13 @@ try{
         Equal (Start-RescusbJob $catalog $settings (FakeDisk) $temp -Resume) 0
         Equal (& $ui {$script:Installs}) 0;Equal (& $ui {$script:SelectedCount}) 7;Equal (& $ui {$script:GapPrompts}) 0
         Equal (Get-Content -LiteralPath (Join-Path $job 'RESCUSB-ESTADO.json') -Raw|ConvertFrom-Json).complete $true
+    }
+    Check 'Enter creates Windows with the tool, then the job completes with all seven' {
+        $job=Join-Path $temp 'tool-job';$null=New-Item -ItemType Directory -Path $job
+        & $ui {param($r);$script:JobRoot=$r;$script:FailMicrosoft=$true;$script:Installs=0;$script:ImageFailures=0;$script:ToolRuns=0;$script:GapAnswer=''} $job
+        Equal (Start-RescusbJob $catalog $settings (FakeDisk) $temp) 0
+        Equal (& $ui {$script:ToolRuns}) 2;Equal (& $ui {$script:SelectedCount}) 7
+        & $ui {$script:GapAnswer='0'}
     }
     Check 'complete job automatically passes all seven resolved images and marks readiness' {
         $job=Join-Path $temp 'complete-job';$null=New-Item -ItemType Directory -Path $job

@@ -31,8 +31,8 @@ try {
         Write-Host '  COMPROBANDO LAS FUENTES | Sin descargas de ISO ni borrado de USB.' -ForegroundColor Cyan
         $plan=Get-RescusbPreparedPlan $catalog $settings $state -IncludeVentoy
         Write-RescusbSourceHint $plan @($settings.images)
-        Assert-RescusbPlanComplete $plan $settings.images
-        Write-Host '  [OK] Todas las fuentes elegidas están disponibles, incluido Windows.' -ForegroundColor Green
+        Assert-RescusbPlanComplete $plan (Get-RescusbCheckedImages $plan @($settings.images))
+        Write-Host '  [OK] Las fuentes elegidas están disponibles.' -ForegroundColor Green
     } else {
         $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
         $principal=New-Object Security.Principal.WindowsPrincipal $identity
@@ -66,7 +66,7 @@ try {
                         Show-UsbCandidates @(Get-UsbCandidates @(Get-DiskInventory))
                         $plan=Get-RescusbPreparedPlan $catalog $settings $state -IncludeVentoy
                         Write-RescusbSourceHint $plan @($settings.images)
-                        Assert-RescusbPlanComplete $plan $settings.images
+                        Assert-RescusbPlanComplete $plan (Get-RescusbCheckedImages $plan @($settings.images))
                         Write-Host '  [OK] Fuentes disponibles. Podés volver al menú y preparar el pendrive.' -ForegroundColor Green
                     }
                     '4' {

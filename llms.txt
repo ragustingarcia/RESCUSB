@@ -8,7 +8,7 @@ RESCUSB instala Ventoy en un pendrive elegido explícitamente, obtiene imágenes
 ## Flujo
 - Una ventana de trabajo; Windows puede mostrar un aviso de administrador al inicio.
 - Solo muestra pendrives USB extraíbles compatibles y confirma el borrado con la serie.
-- Descubre los enlaces y SHA-256 actuales de Windows mediante el flujo normal de la página pública de Microsoft.
+- Windows se crea con la herramienta oficial de creación de medios de Microsoft (tarda de 20 a 60+ minutos); RESCUSB verifica la firma de Microsoft y, con DISM, arquitectura, idioma y versión. Si hay una ISO que coincide con el SHA-256 publicado, la prefiere.
 - Si falta una fuente necesaria, se detiene antes del borrado. Un rechazo del proveedor se respeta: se puede preparar lo disponible y agregar lo que falta después con Continuar.
 - Solo marca completo el contenido que terminó de descargarse/copiarse y verificarse.
 - La verificación de archivos no equivale a una prueba física de arranque.

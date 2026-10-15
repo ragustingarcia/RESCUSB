@@ -4,20 +4,31 @@ Fecha: **15/10/2026**. Motor probado: **Windows PowerShell 5.1**, el mismo que u
 
 ## Pruebas automáticas sin dispositivos reales
 
-**101 casos aprobados, 0 fallos**: 69 pruebas de controles y transferencias en `tests/Probar.ps1`, 26 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
+**96 casos aprobados, 0 fallos**: 69 pruebas de controles y transferencias en `tests/Probar.ps1`, 21 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
 
 ## Cambios de 2.1.0
 
-En la prueba real, Microsoft volvió a negar el enlace automático, y en un navegador de Windows su página manda a la herramienta de creación de medios. La ISO que genera esa herramienta no tiene hash publicado, así que la 2.0.3 nunca podía completar Windows.
+En la prueba real, Microsoft volvió a negar el enlace automático, y en un navegador de Windows su página manda a la herramienta de creación de medios. La ISO que genera esa herramienta no tiene hash publicado, así que con la 2.0.3 Windows nunca podía completarse.
 
-- **ISO de la herramienta de Microsoft, verificada por firma.** Si el camino del hash publicado falla, RESCUSB busca `Windows*.iso` en Descargas e ISO-OFICIALES, la monta en solo lectura y exige firma Authenticode válida de Microsoft Corporation en `setup.exe` y `sources\setup.exe`. Con DISM comprueba que la primera imagen sea x64, del idioma elegido y de la versión correcta. Se copia con su SHA-256 propio y el informe la marca como verificada por firma, sin hash publicado.
-- **La opción [2] baja y abre la herramienta.** Usa los enlaces oficiales `go.microsoft.com` y la ejecuta solo con firma válida de Microsoft. Antes de abrirla explica qué elegir, advierte que no hay que elegir «Unidad flash USB» y espera a que se cierre para volver a comprobar.
-- **Windows 10 opcional.** Sin soporte de Microsoft desde el 14/10/2025, deja de venir marcado por defecto: el paquete recomendado tiene seis herramientas y Windows 10 se agrega desde Ajustes.
+- **Windows va siempre por la herramienta oficial de Microsoft.** Se eliminó el flujo que pedía enlaces a los servicios internos de Microsoft (sesión anónima y API de descarga): siempre era rechazado. Antes de borrar el pendrive, RESCUSB busca una ISO ya creada. Si no hay, explica que **tarda de 20 minutos a más de una hora**, ofrece crearla (Enter elige esta opción) y espera.
+- **La herramienta solo se ejecuta firmada.** Se baja de los `go.microsoft.com` oficiales y se ejecuta solo con firma Authenticode válida de Microsoft Corporation. Antes de abrirla se explica qué elegir y se advierte que no hay que elegir «Unidad flash USB».
+- **La ISO se verifica por firma.** Se monta en solo lectura y se exige firma válida de Microsoft en `setup.exe` y `sources\setup.exe`. Con DISM, la primera imagen tiene que ser x64, del idioma elegido y de la versión correcta. Se copia con su SHA-256 propio y el informe la marca como verificada por firma. Si hay una ISO que coincide con el hash publicado en la página de Microsoft, se prefiere esa.
+- **Windows 10 opcional.** Sin soporte desde el 14/10/2025, deja de venir marcado por defecto.
+- Comprobar fuentes ya no falla por Windows: informa que se crea al armar el pendrive.
 
-Cuatro pruebas nuevas cubren la alternativa ante el rechazo, la exigencia de firma (un binario firmado por Microsoft se acepta y uno sin firma se rechaza), la arquitectura, el idioma y la versión de la imagen, y el nombre, el hash y la marca de verificación de la copia. Se descargaron de verdad las dos herramientas (21.591.048 y 19.463.448 bytes, desde `download.microsoft.com`) y su firma se validó sin ejecutarlas.
+Las pruebas nuevas cubren:
 
-**Falta probarlo con una ISO real generada por la herramienta.** El montaje y la lectura con DISM no se pudieron ejercitar sin una imagen de Windows: las pruebas los simulan.
+- que la búsqueda solo lea la página pública de Microsoft;
+- la preferencia por el hash publicado;
+- la aceptación por firma, también sin Internet;
+- la exigencia de firma: un binario firmado por Microsoft se acepta y uno sin firma se rechaza;
+- la arquitectura, el idioma y la versión de la imagen;
+- el nombre y la marca de la copia;
+- Enter abre la herramienta y el armado se completa.
 
+Se descargaron de verdad las dos herramientas (21.591.048 y 19.463.448 bytes, desde `download.microsoft.com`) y su firma se validó. La herramienta de Windows 11 se abrió en una preparación real y empezó a descargar Windows.
+
+**Falta verificar la ISO real que genere la herramienta.** El montaje y la lectura con DISM se simulan en las pruebas.
 ## Cambios de 2.0.3
 Corrigen lo que apareció al probar el armado real con el Kingston: Microsoft rechazó Windows 10 y 11 y el programa quedaba sin salida, la consulta de fuentes llenaba la pantalla de barras de curl y el encabezado se desordenaba.
 
@@ -36,7 +47,7 @@ Se repitió la consulta real de fuentes: las seis publicaciones fijadas siguen c
 - Reconocimiento ISO9660 y UDF, incluido UDF sin ISO9660, secuencias incompletas y rechazo de HTML como imagen. Siempre se mantiene el hash esperado como condición independiente.
 - Rutas OneDrive con las 16 etiquetas Cloud Files, directorios normales, rutas no creadas y junction real rechazada sin tocar su destino.
 - Descubrimiento dinámico de edición, hash por idioma/x64, nomenclaturas antiguas y actuales de las ISO Microsoft, exclusión de ARM/x86, hosts falsos, ambigüedad, rechazo de servicio y fallo de red.
-- Flujo automático de Microsoft con respuestas simuladas: solo se usan endpoints del proveedor y no se persisten enlaces firmados.
+- Búsqueda de Windows con respuestas simuladas: solo se lee la página pública de Microsoft y nunca se piden enlaces de descarga.
 - Flujo completo de las siete herramientas simulado: si falla Windows en la comprobación previa, no se invoca el instalador ni se escribe en el USB; si termina el contenido elegido, se marca completo; si hay un fallo, se marca parcial.
 - Inicio de una sola ventana comprobado en la estructura del lanzador: no espera dejando el BAT anterior abierto, no repite elevación en la app y no deja otra pausa final en el BAT. El menú vuelve dentro de la misma sesión.
 
