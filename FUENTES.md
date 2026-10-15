@@ -12,6 +12,7 @@ Consultadas el **15/10/2026**. Las versiones fijadas y sus SHA-256 están en `ca
 | Memtest86+ 8.10 x86_64 GRUB | [Página oficial](https://memtest.org/), [SHA-256 del ZIP](https://memtest.org/download/v8.10/sha256sum.txt), [README de arranque](https://memtest.org/readme) |
 | Windows 10 x64 | [Página pública de Microsoft](https://www.microsoft.com/en-us/software-download/windows10ISO) |
 | Windows 11 x64 | [Página pública de Microsoft](https://www.microsoft.com/en-us/software-download/windows11) |
+| Herramienta de creación de medios | [Windows 11](https://go.microsoft.com/fwlink/?linkid=2156295) y [Windows 10](https://go.microsoft.com/fwlink/?LinkId=691209), servidas desde `download.microsoft.com`. Solo se ejecutan con firma Authenticode válida de Microsoft Corporation. |
 
 ## Automatización de Windows
 

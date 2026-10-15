@@ -37,6 +37,10 @@ try{
         param($html)
         $script:FixtureHtml=$html;$script:Calls=@();$script:RejectLinks=$false;$script:HttpFailure=$false
         function script:Find-RescusbLocalWindows {param($Id,$Hash,$Maximum,$StateFolder);return ''}
+        # Mounting an ISO and DISM need a real Windows image: the signature check is simulated.
+        $script:IsoFolders=@();$script:Tested=@()
+        function script:Get-RescusbIsoFolders {param($StateFolder);return $script:IsoFolders}
+        function script:Test-RescusbMediaToolIso {param($Path,$Id,$Language);$script:Tested+=[IO.Path]::GetFileName($Path)}
         function script:Invoke-WebRequest {
             param($Uri,$WebSession,$Headers,[switch]$UseBasicParsing,$MaximumRedirection,$TimeoutSec)
             $script:Calls+=[string]$Uri
@@ -70,6 +74,41 @@ try{
         Equal (Test-Path -LiteralPath (Join-Path $state 'windows11.json')) $false
         & $ms {$script:RejectLinks=$false}
     }
+    Check 'refused session falls back to a Media Creation Tool ISO verified by signature' {
+        $f=Join-Path $temp 'fallback-iso';$null=New-Item -ItemType Directory -Path $f
+        $bytes=New-Object byte[] 40960;[Text.Encoding]::ASCII.GetBytes('CD001').CopyTo($bytes,32769);[IO.File]::WriteAllBytes((Join-Path $f 'Windows.iso'),$bytes)
+        & $ms {param($f);$script:RejectLinks=$true;$script:IsoFolders=@($f)} $f
+        $resolved=Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows11') (Join-Path $temp 'fallback')
+        Equal $resolved.LocalPath (Join-Path $f 'Windows.iso');Equal $resolved.Item.verification 'firma'
+        & $ms {$script:IsoFolders=@()}
+        Reject {Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows11') (Join-Path $temp 'fallback-none')} 'no autorizo'
+        & $ms {$script:RejectLinks=$false}
+    }
+    Check 'Microsoft signature required: system binary accepted, unsigned file rejected' {
+        Assert-MicrosoftSignature (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe')
+        $unsigned=Join-Path $temp 'setup.exe';[IO.File]::WriteAllBytes($unsigned,[byte[]](77,90,0,0));Reject {Assert-MicrosoftSignature $unsigned} 'firma'
+    }
+    Check 'Media Creation Tool image must be x64, chosen language and right Windows version' {
+        $ok=[pscustomobject]@{Architecture=9;Languages=@('es-ES');Version='10.0.26100'}
+        Assert-RescusbWindowsImageInfo $ok 'windows11' 'Spanish'
+        Reject {Assert-RescusbWindowsImageInfo $ok 'windows10' 'Spanish'} 'otra versión'
+        Reject {Assert-RescusbWindowsImageInfo $ok 'windows11' 'English'} 'idioma'
+        Reject {Assert-RescusbWindowsImageInfo ([pscustomobject]@{Architecture=12;Languages=@('es-ES');Version='10.0.26100'}) 'windows11' 'Spanish'} 'x64'
+        Assert-RescusbWindowsImageInfo ([pscustomobject]@{Architecture=9;Languages=@('es-MX');Version='10.0.19045'}) 'windows10' 'Spanish (Mexico)'
+    }
+    Check 'signed local ISO gets its own name, hash and recorded verification' {
+        $f=Join-Path $temp 'mct';$null=New-Item -ItemType Directory -Path $f
+        $p=Join-Path $f 'Windows.iso';$bytes=New-Object byte[] 40960;[Text.Encoding]::ASCII.GetBytes('CD001').CopyTo($bytes,32769);[IO.File]::WriteAllBytes($p,$bytes)
+        [IO.File]::WriteAllBytes((Join-Path $f 'Otro.iso'),$bytes)
+        & $ms {$script:Tested=@()}
+        $state=Join-Path $temp 'mct-state'
+        $found=Find-RescusbMediaToolWindows ($catalog.images|Where-Object id -eq 'windows11') 'Spanish' $state @($f)
+        Equal (@(& $ms {$script:Tested}) -join ',') 'Windows.iso'
+        $h=(Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower()
+        Equal $found.LocalPath $p;Equal $found.Item.sha256 $h;Equal $found.Item.verification 'firma'
+        Equal $found.Item.file ('windows11-herramienta-es-ES-'+$h.Substring(0,8)+'.iso')
+        Equal (Get-Content -LiteralPath (Join-Path $state 'windows11.json') -Raw|ConvertFrom-Json).verification 'firma'
+    }
     Check 'Windows 10 automatic resolution uses its own edition and version identity' {
         $resolved=Resolve-MicrosoftIso ($catalog.images|Where-Object id -eq 'windows10') (Join-Path $temp 'microsoft10') 'Spanish'
         if($resolved.Item.file -notmatch '^Windows10_'){throw 'Se devolvio otra version de Windows'}
@@ -88,7 +127,7 @@ try{
         Equal (Find-RescusbLocalWindows 'windows11' $h 100000 $temp @($f)) $p
         Equal (Find-RescusbLocalWindows 'windows11' ('f'*64) 100000 $temp @($f)) ''
     }
-    Check 'default settings choose all seven and Spanish x64' {$settings=Get-RescusbSettings (Join-Path $temp 'settings') $catalog;Equal $settings.images.Count 7;Equal $settings.language 'Spanish'}
+    Check 'default settings choose six tools, Windows 10 optional, Spanish x64' {$settings=Get-RescusbSettings (Join-Path $temp 'settings') $catalog;Equal $settings.images.Count 6;Equal ($settings.images -contains 'windows10') $false;Equal $settings.language 'Spanish'}
     Check 'invalid settings cannot add arbitrary tools' {$state=Join-Path $temp 'invalid-settings';$null=New-Item -ItemType Directory -Path $state;Save-JsonAtomic @{schema=1;language='Spanish';images=@('disk-wiper')} (Join-Path $state 'configuracion.json');Reject {Get-RescusbSettings $state $catalog}}
     & $ui {
         $script:FailMicrosoft=$false;$script:Installs=0;$script:ImageRuns=0;$script:ImageFailures=0;$script:PreparedCount=0;$script:SelectedCount=0;$script:JobRoot='';$script:GapAnswer='0';$script:GapPrompts=0

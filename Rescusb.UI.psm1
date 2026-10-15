@@ -45,7 +45,8 @@ function Write-RescusbMenu($Settings) {
     Write-Host '  Instala el arranque, descarga las imágenes oficiales y las verifica.'
     Write-Host '  Elegís el pendrive y confirmás. RESCUSB se encarga del resto.' -ForegroundColor Gray
     Write-Host ''
-    Write-Host $(if($Settings.images.Count -eq 7){'  [1] Armar mi pendrive completo'}else{'  [1] Armar mi pendrive con el contenido elegido'}) -ForegroundColor Cyan
+    $full=@($script:RescusbDefaultIds|Where-Object {$_ -notin $Settings.images}).Count -eq 0
+    Write-Host $(if($full){'  [1] Armar mi pendrive completo'}else{'  [1] Armar mi pendrive con el contenido elegido'}) -ForegroundColor Cyan
     Write-Host ('      Primera vez | Prepara Ventoy y '+$Settings.images.Count+' herramientas. Borra el USB.') -ForegroundColor Gray
     Write-Host '  [2] Continuar o completar mi pendrive' -ForegroundColor Cyan
     Write-Host '      Retoma descargas y agrega lo que falta, conservando lo preparado.' -ForegroundColor Gray
@@ -66,8 +67,11 @@ function Write-RescusbStep([int]$Number,[string]$Title,[string]$Description='') 
 function Get-RescusbLanguageLabel([string]$Language) {
     switch($Language){'Spanish'{'Español'} 'Spanish (Mexico)'{'Español (Latinoamérica)'} 'English'{'Inglés'} default{throw 'Idioma no admitido.'}}
 }
+# Windows 10 ended support on 14/10/2025: it stays available but is not chosen by default.
+function Get-RescusbDefaultImages($Catalog) {return @($Catalog.images.id|Where-Object {$_ -ne 'windows10'})}
 function Get-RescusbSettings([string]$StateFolder,$Catalog) {
-    $settings=[pscustomobject]@{schema=1;language='Spanish';images=@($Catalog.images.id)}
+    $script:RescusbDefaultIds=Get-RescusbDefaultImages $Catalog
+    $settings=[pscustomobject]@{schema=1;language='Spanish';images=@(Get-RescusbDefaultImages $Catalog)}
     $path=Join-Path $StateFolder 'configuracion.json'
     if(Test-Path -LiteralPath $path){
         $null=Assert-SafeDirectory $path
@@ -135,10 +139,6 @@ function Assert-RescusbPlanComplete($Plan,$Selected) {
 function Get-RescusbShortName([string]$Id) {
     switch($Id){'systemrescue'{'SystemRescue'} 'memtest'{'Memtest86+'} 'hirens'{"Hiren's BootCD PE"} 'rescuezilla'{'Rescuezilla'} 'ubuntu'{'Ubuntu Live'} 'windows11'{'Windows 11'} 'windows10'{'Windows 10'} default{$Id}}
 }
-function Get-RescusbMicrosoftPage([string]$Id) {
-    if($Id -eq 'windows10'){return 'https://www.microsoft.com/es-es/software-download/windows10ISO'}
-    return 'https://www.microsoft.com/es-es/software-download/windows11'
-}
 function Write-RescusbSourceHint($Plan,$Selected) {
     $missing=@($Selected|Where-Object {-not $Plan.Items.ContainsKey($_)})
     if($missing.Count -eq 0 -or @($Plan.Errors|Where-Object id -eq 'ventoy').Count){return}
@@ -149,7 +149,29 @@ function Write-RescusbSourceHint($Plan,$Selected) {
 }
 # Decide what to prepare when some selected sources are unavailable.
 # Returns the image ids to prepare now, 'retry' to check again, or throws to leave the USB untouched.
-function Resolve-RescusbPlanGaps($Plan,$Selected) {
+function Get-RescusbMediaToolLanguage([string]$Language) {
+    switch($Language){'Spanish'{'Español (España, internacional)'} 'Spanish (Mexico)'{'Español (México)'} 'English'{'Inglés (Estados Unidos)'} default{throw 'Idioma no admitido.'}}
+}
+# Downloads Microsoft's tool, explains the four choices and waits until it closes.
+function Invoke-RescusbMediaTool([string]$Id,[string]$StateFolder,[string]$Language) {
+    $name=Get-RescusbShortName $Id
+    Write-Host ''
+    Write-Host ('  [...] Descargando la herramienta oficial de Microsoft para '+$name) -ForegroundColor DarkGray
+    $tool=Get-RescusbMediaTool $Id $StateFolder
+    Write-Host '  [OK] Herramienta descargada y firmada por Microsoft.' -ForegroundColor Green
+    Write-Host ''
+    Write-Host ('  EN LA HERRAMIENTA DE MICROSOFT | '+$name) -ForegroundColor Cyan
+    Write-Host '  1. Aceptá los términos de Microsoft.'
+    if($Id -eq 'windows10'){Write-Host '     Si pregunta qué querés hacer: «Crear medios de instalación».'}
+    Write-Host ('  2. Idioma: '+(Get-RescusbMediaToolLanguage $Language)+' | Arquitectura: 64 bits (x64).')
+    Write-Host '  3. Elegí «Archivo ISO». NO elijas «Unidad flash USB»: borraría el pendrive.' -ForegroundColor Yellow
+    Write-Host '  4. Guardala en Descargas y esperá a que termine. Después cerrá la herramienta.'
+    Write-Host ''
+    Write-Host '  RESCUSB espera acá y después la comprueba sola.' -ForegroundColor Gray
+    $process=Start-Process -FilePath $tool -PassThru
+    $process.WaitForExit()
+}
+function Resolve-RescusbPlanGaps($Plan,$Selected,[string]$StateFolder='',[string]$Language='Spanish') {
     $missing=@($Selected|Where-Object {-not $Plan.Items.ContainsKey($_)})
     $ventoyFailed=@($Plan.Errors|Where-Object id -eq 'ventoy').Count -gt 0
     if($missing.Count -eq 0 -and -not $ventoyFailed){return ,@($Selected)}
@@ -160,18 +182,17 @@ function Resolve-RescusbPlanGaps($Plan,$Selected) {
     Write-Host ('  [!] '+$available.Count+' de '+$Selected.Count+' herramientas están listas para descargar.') -ForegroundColor Yellow
     Write-Host ('      Falta: '+(@($missing|ForEach-Object {Get-RescusbShortName $_}) -join ', ')+'.') -ForegroundColor Yellow
     if($windows.Count){
-        Write-Host '      Microsoft no entregó el enlace automático de Windows.' -ForegroundColor Gray
-        Write-Host '      Si bajás la ISO oficial desde el navegador, RESCUSB la busca en' -ForegroundColor Gray
-        Write-Host '      Descargas e ISO-OFICIALES y solo la acepta si coincide el SHA-256.' -ForegroundColor Gray
+        Write-Host '      Microsoft no entregó el enlace automático de Windows. Su herramienta' -ForegroundColor Gray
+        Write-Host '      oficial puede generar la ISO, y RESCUSB la acepta si el instalador' -ForegroundColor Gray
+        Write-Host '      está firmado por Microsoft y es x64 en el idioma elegido.' -ForegroundColor Gray
     }
     Write-Host '      Todavía no se borró ni se modificó el pendrive.' -ForegroundColor Gray
     Write-Host ''
     Write-Host ('  [1] Preparar ahora las '+$available.Count+' disponibles') -ForegroundColor Cyan
     Write-Host '      Lo que falta queda pendiente. Se agrega después con «Continuar».' -ForegroundColor Gray
     if($windows.Count){
-        Write-Host '  [2] Abrir la página oficial de Microsoft para descargar la ISO' -ForegroundColor White
-        Write-Host '      Elegí español, x64. En Windows, la página de Windows 10 puede' -ForegroundColor Gray
-        Write-Host '      ofrecer solo la herramienta de creación de medios (otro hash).' -ForegroundColor Gray
+        Write-Host '  [2] Crear la ISO con la herramienta oficial de Microsoft' -ForegroundColor White
+        Write-Host '      RESCUSB la descarga, comprueba su firma y te guía. Tarda un rato.' -ForegroundColor Gray
     }
     Write-Host '  [3] Volver a comprobar las fuentes' -ForegroundColor White
     Write-Host '  [0] Volver al menú sin tocar el pendrive' -ForegroundColor DarkGray
@@ -180,8 +201,10 @@ function Resolve-RescusbPlanGaps($Plan,$Selected) {
         switch($answer){
             '1' {return ,$available}
             {$_ -eq '2' -and $windows.Count} {
-                foreach($id in $windows){Start-Process (Get-RescusbMicrosoftPage $id)}
-                Write-Host '  Se abrió el navegador. Cuando termine la descarga, elegí [3].' -ForegroundColor Gray
+                try {
+                    foreach($id in $windows){Invoke-RescusbMediaTool $id $StateFolder $Language}
+                    return 'retry'
+                } catch {Write-Host ('  [!] '+$_.Exception.Message) -ForegroundColor Yellow}
             }
             '3' {return 'retry'}
             '0' {throw [OperationCanceledException]::new('Todavía falta una fuente oficial. No se borró ni preparó el pendrive.')}
@@ -204,7 +227,7 @@ function Start-RescusbJob($Catalog,$Settings,$Target,[string]$StateFolder,[switc
     $folder=if($root){Join-Path $root 'ISO'}else{''}
     while($true){
         $plan=Get-RescusbPreparedPlan $Catalog $Settings $StateFolder $folder -IncludeVentoy:(-not $Resume)
-        $now=Resolve-RescusbPlanGaps $plan @($Settings.images)
+        $now=Resolve-RescusbPlanGaps $plan @($Settings.images) $StateFolder $Settings.language
         if($now -is [string] -and $now -eq 'retry'){Write-Host '';continue}
         break
     }
@@ -218,13 +241,13 @@ function Start-RescusbJob($Catalog,$Settings,$Target,[string]$StateFolder,[switc
         Write-RescusbStep 3 'Confirmar el pendrive' 'Solo después de tu confirmación se borrará el dispositivo mostrado.'
         $installed=Install-Ventoy $Target $Catalog.ventoy $StateFolder
         $Target=$installed.Target;$root=$installed.Root
-        $marker=[ordered]@{schema=1;product='RESCUSB';version='2.0.3';created=(Get-Date).ToString('o');identity=$Target;ventoy=$Catalog.ventoy.sha256}
+        $marker=[ordered]@{schema=1;product='RESCUSB';version='2.1.0';created=(Get-Date).ToString('o');identity=$Target;ventoy=$Catalog.ventoy.sha256}
         $null=Assert-Target $Target
         Save-JsonAtomic $marker (Join-Path $root 'usb-rescate-identidad.json')
         Save-JsonAtomic $marker (Join-Path $StateFolder 'ultimo-usb.json')
     } else {Write-RescusbStep 3 'Pendrive reconocido' 'Se conserva Ventoy y se completa el contenido elegido.'}
     Write-RescusbStep 4 'Preparando tu caja de herramientas' 'Descargas reanudables directamente al USB. Cada imagen se verifica antes de habilitarse.'
-    $pending=[ordered]@{product='RESCUSB';version='2.0.3';date=(Get-Date).ToString('o');complete=$false;state='preparando';selected=@($Settings.images);pending=$pendingIds;author='Rodolfo Agustín García';authorUrl='https://ragustingarcia.com/';bootTested=$false}
+    $pending=[ordered]@{product='RESCUSB';version='2.1.0';date=(Get-Date).ToString('o');complete=$false;state='preparando';selected=@($Settings.images);pending=$pendingIds;author='Rodolfo Agustín García';authorUrl='https://ragustingarcia.com/';bootTested=$false}
     $null=Assert-Target $Target
     Save-JsonAtomic $pending (Join-Path $root 'RESCUSB-ESTADO.json')
     Save-JsonAtomic $pending (Join-Path $StateFolder 'ultimo-resultado.json')
@@ -233,7 +256,7 @@ function Start-RescusbJob($Catalog,$Settings,$Target,[string]$StateFolder,[switc
     # Skipped sources count as missing: a pendrive without them is never marked LISTO.
     $missing=$failures+$pendingIds.Count
     $complete=($missing -eq 0)
-    $status=[ordered]@{product='RESCUSB';version='2.0.3';date=(Get-Date).ToString('o');complete=$complete;selected=@($Settings.images);pending=$pendingIds;failures=$missing;author='Rodolfo Agustín García';authorUrl='https://ragustingarcia.com/';bootTested=$false}
+    $status=[ordered]@{product='RESCUSB';version='2.1.0';date=(Get-Date).ToString('o');complete=$complete;selected=@($Settings.images);pending=$pendingIds;failures=$missing;author='Rodolfo Agustín García';authorUrl='https://ragustingarcia.com/';bootTested=$false}
     $null=Assert-Target $Target
     Save-JsonAtomic $status (Join-Path $root 'RESCUSB-ESTADO.json')
     Save-JsonAtomic $status (Join-Path $StateFolder 'ultimo-resultado.json')
@@ -259,7 +282,7 @@ function Show-RescusbHelp($Catalog) {
     Write-RescusbHeader -Clear
     Write-Host '  UNA CAJA DE HERRAMIENTAS QUE ARRANCA DESDE TU USB' -ForegroundColor Cyan
     Write-Host ''
-    Show-RescusbContents $Catalog @($Catalog.images.id)
+    Show-RescusbContents $Catalog @(Get-RescusbDefaultImages $Catalog)
     Write-Host ''
     Write-Host '  Cómo funciona'
     Write-Host '  1. Elegís tu pendrive. Los discos internos nunca aparecen.' -ForegroundColor Gray
@@ -271,6 +294,7 @@ function Show-RescusbHelp($Catalog) {
     Write-Host '  Dejá el pendrive conectado durante todo el proceso.' -ForegroundColor Cyan
     Write-Host '  No se exige desconectarlo: su identidad se vuelve a comprobar automáticamente.' -ForegroundColor Gray
     Write-Host '  Windows se prepara en español y x64 por defecto. El idioma se cambia en Ajustes.' -ForegroundColor Gray
+    Write-Host '  Windows 10 ya no tiene soporte de Microsoft: se agrega desde Ajustes.' -ForegroundColor Gray
     Write-Host '  Las ISO de Windows permiten reparar o instalar; no son un Windows portátil.' -ForegroundColor Gray
     Write-Host '  Secure Boot y el arranque de cada imagen dependen del firmware y del equipo.' -ForegroundColor Gray
     Write-Host '  No se cambian claves del firmware, licencias ni opciones del BIOS.' -ForegroundColor Gray

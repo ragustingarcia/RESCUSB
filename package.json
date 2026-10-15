@@ -1,6 +1,6 @@
 {
   "name": "rescusb",
-  "version": "2.0.3",
+  "version": "2.1.0",
   "private": true,
   "description": "Prepara un pendrive multiboot de rescate con Ventoy, fuentes oficiales y verificacion de integridad.",
   "author": {

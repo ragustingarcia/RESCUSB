@@ -28,7 +28,7 @@ try {
     } elseif($Modo -eq 'Fuentes') {
         Write-RescusbHeader
         if(-not(Test-Path -LiteralPath $state)){$null=New-Item -ItemType Directory -Path $state}
-        Write-Host '  COMPROBANDO LAS SIETE FUENTES | Sin descargas de ISO ni borrado de USB.' -ForegroundColor Cyan
+        Write-Host '  COMPROBANDO LAS FUENTES | Sin descargas de ISO ni borrado de USB.' -ForegroundColor Cyan
         $plan=Get-RescusbPreparedPlan $catalog $settings $state -IncludeVentoy
         Write-RescusbSourceHint $plan @($settings.images)
         Assert-RescusbPlanComplete $plan $settings.images
@@ -71,10 +71,10 @@ try {
                     }
                     '4' {
                         Write-RescusbHeader -Clear
-                        Write-Host '  AJUSTES | El paquete completo viene elegido por defecto.' -ForegroundColor Cyan
+                        Write-Host '  AJUSTES | El paquete recomendado viene elegido por defecto.' -ForegroundColor Cyan
                         Write-Host '  [1] Idioma de Windows'
                         Write-Host '  [2] Elegir herramientas (opcional)'
-                        Write-Host '  [3] Restablecer paquete completo'
+                        Write-Host '  [3] Restablecer el paquete recomendado (sin Windows 10)'
                         Write-Host '  [0] Volver'
                         $option=Read-Host '  Elegir ajuste'
                         if($option -eq '1'){
@@ -90,7 +90,7 @@ try {
                                 if($list -notmatch '^\s*[1-7](\s*,\s*[1-7])*\s*$'){throw 'Usá los números mostrados, separados por coma.'}
                                 $settings.images=@($list.Split(',')|ForEach-Object {$catalog.images[[int]$_.Trim()-1].id}|Select-Object -Unique)
                             }
-                        } elseif($option -eq '3'){$settings.images=@($catalog.images.id)}
+                        } elseif($option -eq '3'){$settings.images=@(Get-RescusbDefaultImages $catalog)}
                         else{throw [OperationCanceledException]::new('Sin cambios.')}
                         Save-JsonAtomic $settings (Join-Path $state 'configuracion.json')
                         Write-Host '  [OK] Ajustes guardados.' -ForegroundColor Green

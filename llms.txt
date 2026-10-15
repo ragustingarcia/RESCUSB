@@ -3,7 +3,7 @@
 > Aplicación local de Windows para preparar un pendrive multiboot de rescate, por Rodolfo Agustín García | https://ragustingarcia.com/.
 
 ## Producto
-RESCUSB instala Ventoy en un pendrive elegido explícitamente, obtiene imágenes oficiales, reanuda descargas y comprueba su integridad. La preparación completa incluye SystemRescue, Hiren's BootCD PE, Rescuezilla, Ubuntu Desktop Live, Windows 10, Windows 11 y Memtest86+.
+RESCUSB instala Ventoy en un pendrive elegido explícitamente, obtiene imágenes oficiales, reanuda descargas y comprueba su integridad. La preparación recomendada incluye SystemRescue, Hiren's BootCD PE, Rescuezilla, Ubuntu Desktop Live, Windows 11 y Memtest86+; Windows 10 es opcional.
 
 ## Flujo
 - Una ventana de trabajo; Windows puede mostrar un aviso de administrador al inicio.

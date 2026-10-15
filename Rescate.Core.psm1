@@ -444,6 +444,7 @@ function Get-SavedWindowsItem($Item, [string]$StateFolder, [string]$Folder) {
     if($m.file -notmatch '^[A-Za-z0-9_.-]+\.iso$' -or $m.file -match '\.\.'){throw 'Nombre Windows guardado invalido.'}
     $copy.file=$m.file
     if($m.PSObject.Properties['name']){$copy.name=$m.name}
+    if($m.PSObject.Properties['verification']){$copy|Add-Member -NotePropertyName verification -NotePropertyValue $m.verification}
     foreach($suffix in @('','.part')) {
         $p=Join-Path $Folder ($copy.file+$suffix)
         if ((Test-Path -LiteralPath $p) -and (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash -ieq $m.sha256) {
@@ -514,6 +515,9 @@ function Invoke-ImagePlan($Catalog, $Target, [string]$Root, $Selected, [string]$
             try { $hash=Assert-FileHash $path $expectedHash }
             catch { Move-InvalidImage $path $guard; throw }
             $status='VERIFICADO'; $detail='Descargado y verificado.'
+            if($item.PSObject.Properties['verification'] -and $item.verification -eq 'firma'){
+                $detail='Copiada de la herramienta de Microsoft; verificada por firma, sin hash publicado.'
+            }
             Write-Host ('  [OK] '+$item.name) -ForegroundColor Green
         } catch { $failed++; $detail=$_.Exception.Message; Write-Warning $detail }
         finally {

@@ -1,13 +1,24 @@
-# RESCUSB 2.0.3 | Validación
+# RESCUSB 2.1.0 | Validación
 
 Fecha: **15/10/2026**. Motor probado: **Windows PowerShell 5.1**, el mismo que usa INICIAR.bat.
 
 ## Pruebas automáticas sin dispositivos reales
 
-**97 casos aprobados, 0 fallos**: 69 pruebas de controles y transferencias en `tests/Probar.ps1`, 22 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
+**101 casos aprobados, 0 fallos**: 69 pruebas de controles y transferencias en `tests/Probar.ps1`, 26 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
+
+## Cambios de 2.1.0
+
+En la prueba real, Microsoft volvió a negar el enlace automático, y en un navegador de Windows su página manda a la herramienta de creación de medios. La ISO que genera esa herramienta no tiene hash publicado, así que la 2.0.3 nunca podía completar Windows.
+
+- **ISO de la herramienta de Microsoft, verificada por firma.** Si el camino del hash publicado falla, RESCUSB busca `Windows*.iso` en Descargas e ISO-OFICIALES, la monta en solo lectura y exige firma Authenticode válida de Microsoft Corporation en `setup.exe` y `sources\setup.exe`. Con DISM comprueba que la primera imagen sea x64, del idioma elegido y de la versión correcta. Se copia con su SHA-256 propio y el informe la marca como verificada por firma, sin hash publicado.
+- **La opción [2] baja y abre la herramienta.** Usa los enlaces oficiales `go.microsoft.com` y la ejecuta solo con firma válida de Microsoft. Antes de abrirla explica qué elegir, advierte que no hay que elegir «Unidad flash USB» y espera a que se cierre para volver a comprobar.
+- **Windows 10 opcional.** Sin soporte de Microsoft desde el 14/10/2025, deja de venir marcado por defecto: el paquete recomendado tiene seis herramientas y Windows 10 se agrega desde Ajustes.
+
+Cuatro pruebas nuevas cubren la alternativa ante el rechazo, la exigencia de firma (un binario firmado por Microsoft se acepta y uno sin firma se rechaza), la arquitectura, el idioma y la versión de la imagen, y el nombre, el hash y la marca de verificación de la copia. Se descargaron de verdad las dos herramientas (21.591.048 y 19.463.448 bytes, desde `download.microsoft.com`) y su firma se validó sin ejecutarlas.
+
+**Falta probarlo con una ISO real generada por la herramienta.** El montaje y la lectura con DISM no se pudieron ejercitar sin una imagen de Windows: las pruebas los simulan.
 
 ## Cambios de 2.0.3
-
 Corrigen lo que apareció al probar el armado real con el Kingston: Microsoft rechazó Windows 10 y 11 y el programa quedaba sin salida, la consulta de fuentes llenaba la pantalla de barras de curl y el encabezado se desordenaba.
 
 - **Windows pendiente en lugar de bloqueo total.** Si faltan fuentes y Ventoy está disponible, RESCUSB muestra qué falta y ofrece: preparar ahora lo disponible, abrir la página oficial de Microsoft para bajar la ISO desde el navegador o volver a comprobar. Nada se borra antes de esa elección. Lo omitido queda en `pending` del estado, el pendrive **nunca** se marca LISTO y **Continuar** vuelve a intentarlo sin reinstalar Ventoy. Dos pruebas nuevas cubren ambos tramos: cinco herramientas preparadas con Windows pendiente y la reanudación que lo completa.
