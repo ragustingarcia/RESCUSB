@@ -325,6 +325,7 @@ try {
                 $p=[pscustomobject]@{};$p|Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {param($ms);return $true};return $p
             }
             function script:Get-UsbRoot {param($Target);return $script:InstallerTemp}
+            function script:Get-ControlledFolderPreference {return $null}
         } $temp (New-FakeDisk)
         $result=Install-Ventoy (New-FakeDisk) $catalog.ventoy $temp
         Equal $result.Root $temp
@@ -335,6 +336,55 @@ try {
         Equal (& $mod {$script:Launches}) 1
         & $mod {$script:WrongConfirmation=$false;$script:CliResult='1'}
         Reject {Install-Ventoy (New-FakeDisk) $catalog.ventoy $temp} 'Ventoy informo'
+        Equal (Test-Path -LiteralPath (Join-Path $temp 'ventoy-instalador\Ventoy2Disk.exe')) $true
+        & $mod {$script:CliResult='1'}
+    }
+    Check 'Controlled Folder Access: blocks only when enabled and Ventoy is not allowed' {
+        $exe='C:\RESCUSB\estado\ventoy-instalador\ventoy-1.1.18\Ventoy2Disk.exe'
+        Equal (Test-ControlledFolderBlocks $null $exe) $false
+        Equal (Test-ControlledFolderBlocks ([pscustomobject]@{EnableControlledFolderAccess=0;ControlledFolderAccessAllowedApplications=$null}) $exe) $false
+        Equal (Test-ControlledFolderBlocks ([pscustomobject]@{EnableControlledFolderAccess=2;ControlledFolderAccessAllowedApplications=$null}) $exe) $false
+        Equal (Test-ControlledFolderBlocks ([pscustomobject]@{EnableControlledFolderAccess=1;ControlledFolderAccessAllowedApplications=$null}) $exe) $true
+        Equal (Test-ControlledFolderBlocks ([pscustomobject]@{EnableControlledFolderAccess=3;ControlledFolderAccessAllowedApplications=@('C:\Otro.exe')}) $exe) $true
+        Equal (Test-ControlledFolderBlocks ([pscustomobject]@{EnableControlledFolderAccess=1;ControlledFolderAccessAllowedApplications=@($exe.ToUpper())}) $exe) $false
+    }
+    Check 'blocked Ventoy asks for permission before confirmation and never erases on cancel' {
+        & $mod {
+            $script:Launches=0;$script:CliResult='0';$script:Allowed=$false;$script:Opened=0
+            function script:Get-ControlledFolderPreference {[pscustomobject]@{EnableControlledFolderAccess=1;ControlledFolderAccessAllowedApplications=$(if($script:Allowed){@($script:ExePath)}else{@()})}}
+            function script:Set-Clipboard {param($Value);$script:ExePath=$Value}
+            function script:Open-RansomwareProtection {$script:Opened++}
+            function script:Read-Host {param($Prompt);if($Prompt -like '*permitido*'){return '0'};return (Get-ConfirmationText $script:Disk)}
+        }
+        try {
+            Reject {Install-Ventoy (New-FakeDisk) $catalog.ventoy $temp} 'permiso'
+            Equal (& $mod {$script:Launches}) 0;Equal (& $mod {$script:Opened}) 1
+            if((& $mod {$script:ExePath}) -notlike '*\ventoy-instalador\*Ventoy2Disk.exe'){throw 'Ruta copiada inesperada'}
+            & $mod {
+                function script:Read-Host {param($Prompt);if($Prompt -like '*permitido*'){$script:Allowed=$true;return ''};return (Get-ConfirmationText $script:Disk)}
+            }
+            $null=Install-Ventoy (New-FakeDisk) $catalog.ventoy $temp
+            Equal (& $mod {$script:Launches}) 1
+        } finally {
+            & $mod {
+                function script:Get-ControlledFolderPreference {return $null}
+                function script:Read-Host {param($Prompt);return (Get-ConfirmationText $script:Disk)}
+            }
+        }
+    }
+    Check 'error 5 from Ventoy is explained as a Windows write block' {
+        & $mod {
+            $script:CliResult='1'
+            function script:Start-Process {
+                param($FilePath,$ArgumentList,$WorkingDirectory,$WindowStyle,[switch]$PassThru)
+                $script:Launches++
+                [IO.File]::WriteAllText((Join-Path $WorkingDirectory 'cli_log.txt'),'WriteFile error bRet:0 WriteSize:512 dwSize:0 ErrCode:5')
+                [IO.File]::WriteAllText((Join-Path $WorkingDirectory 'cli_done.txt'),'1')
+                $p=[pscustomobject]@{};$p|Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {param($ms);return $true};return $p
+            }
+            function script:Read-Host {param($Prompt);return (Get-ConfirmationText $script:Disk)}
+        }
+        Reject {Install-Ventoy (New-FakeDisk) $catalog.ventoy $temp} 'Acceso controlado'
     }
     Check 'image plan continues after failure and reports partial result' {
         & $mod {
