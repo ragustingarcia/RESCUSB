@@ -1,0 +1,21 @@
+{
+  "name": "RESCUSB",
+  "version": "2.0.3",
+  "description": "Tu pendrive de rescate. Preparado para cuando algo falla.",
+  "author": {
+    "name": "Rodolfo Agustín García",
+    "url": "https://ragustingarcia.com/",
+    "id": "https://ragustingarcia.com/#person"
+  },
+  "display_visibility": "full",
+  "publicUrl": null,
+  "repository": "https://github.com/ragustingarcia/RESCUSB",
+  "colors": {
+    "bg": "#0b141c",
+    "panel": "#13232e",
+    "cyan": "#38d9e8",
+    "green": "#b9ef70",
+    "white": "#edf7fa",
+    "muted": "#8ca5b5"
+  }
+}

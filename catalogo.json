@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "verifiedDate": "2026-10-15",
+  "reserveBytes": 2147483648,
+  "ventoy": {
+    "id": "ventoy", "name": "Ventoy 1.1.18", "file": "ventoy-1.1.18-windows.zip",
+    "url": "https://github.com/ventoy/Ventoy/releases/download/v1.1.18/ventoy-1.1.18-windows.zip",
+    "sha256": "082c478e8c432e1ac653899fcf50e3a4077a2851bc6112b5ddd30545962164a9",
+    "hashSource": "https://github.com/ventoy/Ventoy/releases/download/v1.1.18/sha256.txt",
+    "source": "https://www.ventoy.net/en/download.html", "budgetBytes": 33554432, "exactBytes": 16680699, "kind": "zip"
+  },
+  "images": [
+    {
+      "id": "systemrescue", "name": "SystemRescue 13.02 amd64", "file": "systemrescue-13.02-amd64.iso",
+      "url": "https://fastly-cdn.system-rescue.org/releases/13.02/systemrescue-13.02-amd64.iso",
+      "sha256": "ad4d670b72859d887c7960142a9a9d36a3e50446694a035e254442f65d6e7572",
+      "hashSource": "https://www.system-rescue.org/releases/13.02/systemrescue-13.02-amd64.iso.sha256",
+      "source": "https://www.system-rescue.org/Download/", "budgetBytes": 2147483648, "exactBytes": 0, "kind": "iso"
+    },
+    {
+      "id": "memtest", "name": "Memtest86+ 8.10 x86_64 GRUB", "file": "mt86plus_8.10_x86_64.grub.iso.zip",
+      "url": "https://memtest.org/download/v8.10/mt86plus_8.10_x86_64.grub.iso.zip",
+      "sha256": "49a7ee7982d4683b8775ee9e79f499fc33d9ff0aac0a824243ab8462e2d14881",
+      "hashSource": "https://memtest.org/download/v8.10/sha256sum.txt",
+      "source": "https://memtest.org/", "budgetBytes": 33554432, "exactBytes": 0, "kind": "zipiso"
+    },
+    {
+      "id": "hirens", "name": "Hiren's BootCD PE x64 1.0.8", "file": "HBCD_PE_x64.iso",
+      "url": "https://www.hirensbootcd.org/files/HBCD_PE_x64.iso",
+      "sha256": "8c4c670c9c84d6c4b5a9c32e0aa5a55d8c23de851d259207d54679ea774c2498",
+      "hashSource": "https://www.hirensbootcd.org/download/",
+      "source": "https://www.hirensbootcd.org/download/", "budgetBytes": 4294967296, "exactBytes": 3291686912, "kind": "iso"
+    },
+    {
+      "id": "rescuezilla", "name": "Rescuezilla 2.6.2 resolute 64-bit", "file": "rescuezilla-2.6.2-64bit.resolute.iso",
+      "url": "https://github.com/rescuezilla/rescuezilla/releases/download/2.6.2/rescuezilla-2.6.2-64bit.resolute.iso",
+      "sha256": "20dfdad31d3da56b8dd3978159721f19071916f65e123003a850fdecec85ae3f",
+      "hashSource": "https://github.com/rescuezilla/rescuezilla/releases/download/2.6.2/SHA256SUM",
+      "source": "https://rescuezilla.com/download", "budgetBytes": 2147483648, "exactBytes": 1722134528, "kind": "iso"
+    },
+    {
+      "id": "ubuntu", "name": "Ubuntu Desktop Live 26.04.1 LTS amd64", "file": "ubuntu-26.04.1-desktop-amd64.iso",
+      "url": "https://releases.ubuntu.com/26.04/ubuntu-26.04.1-desktop-amd64.iso",
+      "sha256": "601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f",
+      "hashSource": "https://releases.ubuntu.com/26.04/SHA256SUMS",
+      "source": "https://releases.ubuntu.com/26.04/", "budgetBytes": 8589934592, "exactBytes": 0, "kind": "iso"
+    },
+    {
+      "id": "windows11", "name": "Windows 11 x64", "file": "Windows11-x64.iso",
+      "url": "", "sha256": "", "hashSource": "https://www.microsoft.com/es-es/software-download/windows11",
+      "source": "https://www.microsoft.com/es-es/software-download/windows11", "budgetBytes": 10737418240, "exactBytes": 0, "kind": "windows"
+    },
+    {
+      "id": "windows10", "name": "Windows 10 x64", "file": "Windows10-x64.iso",
+      "url": "", "sha256": "", "hashSource": "https://www.microsoft.com/es-es/software-download/windows10ISO",
+      "source": "https://www.microsoft.com/es-es/software-download/windows10ISO", "budgetBytes": 10737418240, "exactBytes": 0, "kind": "windows"
+    }
+  ]
+}

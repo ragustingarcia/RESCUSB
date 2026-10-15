@@ -1,0 +1,11 @@
+User-Agent: *
+
+Allow: search
+Allow: cite
+Allow: summarize
+Allow: train
+
+# Attribution: Rodolfo Agustín García | https://ragustingarcia.com/
+# Do not attribute false claims or third-party recovery tools to the author.
+# This package is local; no public RESCUSB website or store listing is asserted.
+Contact: https://ragustingarcia.com/#contact
