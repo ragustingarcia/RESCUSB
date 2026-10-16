@@ -1,13 +1,59 @@
-# RESCUSB 2.0.3 | Validación
+# RESCUSB 2.1.0 | Validación
 
 Fecha: **15/10/2026**. Motor probado: **Windows PowerShell 5.1**, el mismo que usa INICIAR.bat.
 
 ## Pruebas automáticas sin dispositivos reales
 
-**97 casos aprobados, 0 fallos**: 69 pruebas de controles y transferencias en `tests/Probar.ps1`, 22 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
+**102 casos aprobados, 0 fallos**: 72 pruebas de controles y transferencias en `tests/Probar.ps1`, 24 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
 
+## Primera preparación real completa (16/10/2026)
+
+Con el Kingston DataTraveler 3.0 de 61,99 GB, RESCUSB 2.1.0 terminó en **LISTO: 6 de 6 herramientas preparadas y verificadas**:
+
+| Imagen | Tamaño | Resultado |
+|---|---|---|
+| SystemRescue 13.02 | 1.318 MB | Descargada y verificada por hash publicado |
+| Memtest86+ 8.10 | 19 MB | Extraída del ZIP verificado |
+| Hiren's BootCD PE 1.0.8 | 3.139 MB | Descargada y verificada por hash publicado |
+| Rescuezilla 2.6.2 | 1.642 MB | Descargada y verificada por hash publicado |
+| Ubuntu 26.04.1 | 6.182 MB | Descargada y verificada por hash publicado |
+| Windows 11 (español, x64) | 6.901 MB | Creada con la herramienta de Microsoft, verificada por firma y DISM, copiada y releída |
+
+Ventoy 1.1.18 se instaló en MBR con exFAT y VTOYEFI. Para eso hubo que permitir `Ventoy2Disk.exe` en Acceso controlado a carpetas, y RESCUSB lo indicó antes del borrado. El pendrive quedó con 18,8 GB usados y 38,9 GB libres, y `RESCUSB-ESTADO.json` registra `complete: true` y ningún pendiente. El puerto entregaba 32 MB/s de lectura, por lo que las verificaciones dominaron el tiempo total.
+
+**Sigue pendiente la prueba de arranque** en un equipo real (UEFI y Legacy, con y sin Secure Boot). `bootTested` sigue en `false` hasta hacerla.
+## Cambios de 2.1.0
+
+En la prueba real, Microsoft volvió a negar el enlace automático, y en un navegador de Windows su página manda a la herramienta de creación de medios. La ISO que genera esa herramienta no tiene hash publicado, así que con la 2.0.3 Windows nunca podía completarse.
+
+- **Windows va siempre por la herramienta oficial de Microsoft.** Se eliminó el flujo que pedía enlaces a los servicios internos de Microsoft (sesión anónima y API de descarga): siempre era rechazado. Antes de borrar el pendrive, RESCUSB busca una ISO ya creada. Si no hay, explica que **tarda de 20 minutos a más de una hora**, ofrece crearla (Enter elige esta opción) y espera.
+- **La herramienta solo se ejecuta firmada.** Se baja de los `go.microsoft.com` oficiales y se ejecuta solo con firma Authenticode válida de Microsoft Corporation. Antes de abrirla se explica qué elegir y se advierte que no hay que elegir «Unidad flash USB».
+- **La ISO se verifica por firma.** Se monta en solo lectura y se exige firma válida de Microsoft en `setup.exe` y `sources\setup.exe`. Con DISM, la primera imagen tiene que ser x64, del idioma elegido y de la versión correcta. Se copia con su SHA-256 propio y el informe la marca como verificada por firma. Si hay una ISO que coincide con el hash publicado en la página de Microsoft, se prefiere esa.
+- **Windows 10 opcional.** Sin soporte desde el 14/10/2025, deja de venir marcado por defecto.
+- Comprobar fuentes ya no falla por Windows: informa que se crea al armar el pendrive.
+- **Verificaciones con progreso.** En la prueba real, el Kingston leía a 32 MB/s (el techo de un puerto USB 2.0). Cada pasada de verificación de Hiren's (3,1 GB) tardaba casi 2 minutos sin ninguna señal en pantalla, y parecía colgado. El SHA-256 ahora se calcula por bloques y muestra MB leídos, velocidad y tiempo restante, también para la ISO de Windows.
+- **Acceso controlado a carpetas.** En la primera instalación real, Ventoy borró las particiones del Kingston, pero las tres escrituras de formato recibieron `ErrCode:5`. Defender registró el evento 1127: el Acceso controlado a carpetas impidió que Ventoy2Disk.exe modificara `\Device\Harddisk1\DR12`. Ahora:
+  - antes de pedir la confirmación, RESCUSB lee `Get-MpPreference`. Si la protección está en modo 1 o 3 y Ventoy no figura como permitido, se detiene, abre Seguridad de Windows, copia la ruta y espera; con 0 vuelve sin borrar;
+  - Ventoy se extrae siempre en `estado\ventoy-instalador`, de nuevo y verificado en cada corrida, para que la excepción se mantenga;
+  - si igual aparece `ErrCode:5`, el error lo explica como un bloqueo de escritura de Windows;
+  - la confirmación pasó a voseo y con tildes, y una unidad sin letra se muestra como «Sin letra asignada».
+- **Reconexión del pendrive.** En la prueba real, el Kingston desapareció de Windows mientras se creaba Windows 11 y el programa volvía al menú. Ahora, antes del borrado, RESCUSB avisa, espera a que lo vuelvas a conectar y lo reconoce aunque cambie el número de disco. Exige que coincidan modelo, capacidad, las dos series, el identificador PNP y la ruta; nunca adopta otro dispositivo. En la segunda prueba real, el aviso apareció justo después de desmontar la ISO y el pendrive se reconoció solo con Enter, sin reconectarlo: Windows tardaba unos segundos en volver a listarlo. Por eso primero reintenta en silencio unos 12 segundos, refrescando el inventario de almacenamiento, y recién después pide reconectar.
+
+Las pruebas nuevas cubren:
+
+- que la búsqueda solo lea la página pública de Microsoft;
+- la preferencia por el hash publicado;
+- la aceptación por firma, también sin Internet;
+- la exigencia de firma: un binario firmado por Microsoft se acepta y uno sin firma se rechaza;
+- la arquitectura, el idioma y la versión de la imagen;
+- el nombre y la marca de la copia;
+- Enter abre la herramienta y el armado se completa;
+- el pendrive reconectado se reconoce con otro número de disco y nunca se confunde con otro.
+
+Se descargaron de verdad las dos herramientas (21.591.048 y 19.463.448 bytes, desde `download.microsoft.com`) y su firma se validó. La herramienta de Windows 11 se abrió en una preparación real y empezó a descargar Windows.
+
+**Verificado con una ISO real:** la herramienta generó `Windows.iso` (7.236.550.656 bytes, Windows 11 en español, x64). RESCUSB la montó, validó la firma de Microsoft de los dos `setup.exe` y, con DISM, la arquitectura, el idioma y la versión. La aceptó como `windows11-herramienta-es-ES-2f7deb7b.iso`. En las pruebas automáticas, el montaje y DISM se siguen simulando.
 ## Cambios de 2.0.3
-
 Corrigen lo que apareció al probar el armado real con el Kingston: Microsoft rechazó Windows 10 y 11 y el programa quedaba sin salida, la consulta de fuentes llenaba la pantalla de barras de curl y el encabezado se desordenaba.
 
 - **Windows pendiente en lugar de bloqueo total.** Si faltan fuentes y Ventoy está disponible, RESCUSB muestra qué falta y ofrece: preparar ahora lo disponible, abrir la página oficial de Microsoft para bajar la ISO desde el navegador o volver a comprobar. Nada se borra antes de esa elección. Lo omitido queda en `pending` del estado, el pendrive **nunca** se marca LISTO y **Continuar** vuelve a intentarlo sin reinstalar Ventoy. Dos pruebas nuevas cubren ambos tramos: cinco herramientas preparadas con Windows pendiente y la reanudación que lo completa.
@@ -25,7 +71,7 @@ Se repitió la consulta real de fuentes: las seis publicaciones fijadas siguen c
 - Reconocimiento ISO9660 y UDF, incluido UDF sin ISO9660, secuencias incompletas y rechazo de HTML como imagen. Siempre se mantiene el hash esperado como condición independiente.
 - Rutas OneDrive con las 16 etiquetas Cloud Files, directorios normales, rutas no creadas y junction real rechazada sin tocar su destino.
 - Descubrimiento dinámico de edición, hash por idioma/x64, nomenclaturas antiguas y actuales de las ISO Microsoft, exclusión de ARM/x86, hosts falsos, ambigüedad, rechazo de servicio y fallo de red.
-- Flujo automático de Microsoft con respuestas simuladas: solo se usan endpoints del proveedor y no se persisten enlaces firmados.
+- Búsqueda de Windows con respuestas simuladas: solo se lee la página pública de Microsoft y nunca se piden enlaces de descarga.
 - Flujo completo de las siete herramientas simulado: si falla Windows en la comprobación previa, no se invoca el instalador ni se escribe en el USB; si termina el contenido elegido, se marca completo; si hay un fallo, se marca parcial.
 - Inicio de una sola ventana comprobado en la estructura del lanzador: no espera dejando el BAT anterior abierto, no repite elevación en la app y no deja otra pausa final en el BAT. El menú vuelve dentro de la misma sesión.
 
@@ -62,7 +108,7 @@ Se repitió una reanudación HTTP real de Memtest desde un archivo nuevo de 1.02
 
 ## Lo que sigue pendiente
 
-No se formateó ni se escribió ningún pendrive durante el desarrollo. Quedan pendientes la instalación real de Ventoy, detección de sus volúmenes después de formatear, descarga íntegra de las ISO grandes sobre ese USB y arranque físico de las imágenes en equipos Legacy/UEFI y sus configuraciones de Secure Boot.
+La instalación real de Ventoy, la detección de sus volúmenes y la descarga íntegra de las ISO sobre el USB ya se validaron (ver «Primera preparación real completa»). Queda pendiente el arranque físico de las imágenes en equipos Legacy/UEFI y sus configuraciones de Secure Boot.
 
 No se descargaron completas las ISO de Windows, SystemRescue, Hiren, Rescuezilla ni Ubuntu. La obtención de metadatos, enlaces y hashes no equivale a verificar todos los bytes de esas imágenes. RESCUSB solo marca LISTO cuando el usuario ejecuta el flujo y todas las imágenes elegidas terminan correctamente. El campo `bootTested` permanece en false porque no representa una prueba física.
 

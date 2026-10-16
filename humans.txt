@@ -6,7 +6,7 @@ Location: Tigre, Buenos Aires, AR
 
 /* PRODUCT */
 Name: RESCUSB
-Version: 2.0.3
+Version: 2.1.0
 Components: Windows BAT, Windows PowerShell 5.1, Windows curl, Ventoy, official ISO sources
 Interface: Local terminal
 Repository: https://github.com/ragustingarcia/RESCUSB

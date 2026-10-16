@@ -101,10 +101,39 @@ function Test-OfficialChecksum($Item) {
     } else { $actual = Get-ChecksumFromText $text $Item.file }
     if ($actual -ine $Item.sha256) { throw "El checksum publicado cambio: $($Item.name). Actualice el catalogo revisando la fuente oficial." }
 }
+# Re-reading a multi-GB image from a USB 2.0 pendrive takes minutes: show speed and time left
+# so a long verification never looks frozen.
+function Get-Sha256WithProgress([string]$Path) {
+    $name = [IO.Path]::GetFileName($Path)
+    $stream = New-Object IO.FileStream($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read, 4194304)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $total = [math]::Max(1L, $stream.Length); $done = 0L
+        $buffer = New-Object byte[] 4194304
+        $clock = [Diagnostics.Stopwatch]::StartNew(); $shown = -1
+        while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $null = $sha.TransformBlock($buffer, 0, $read, $null, 0)
+            $done += $read
+            $second = [int]$clock.Elapsed.TotalSeconds
+            if ($second -ne $shown -and $clock.Elapsed.TotalSeconds -ge 1) {
+                $shown = $second
+                $speed = $done / [math]::Max(0.001, $clock.Elapsed.TotalSeconds)
+                $left = [int](($total - $done) / [math]::Max(1, $speed))
+                $status = '{0:N0} de {1:N0} MB | {2:N0} MB/s | faltan {3}' -f ($done/1MB), ($total/1MB), ($speed/1MB), ([TimeSpan]::FromSeconds($left).ToString('mm\:ss'))
+                Write-Progress -Activity ('RESCUSB | Comprobando integridad | '+$name) -Status $status -PercentComplete ([int](100 * $done / $total))
+            }
+        }
+        $null = $sha.TransformFinalBlock($buffer, 0, 0)
+        return (-join ($sha.Hash | ForEach-Object { $_.ToString('x2') }))
+    } finally {
+        Write-Progress -Activity ('RESCUSB | Comprobando integridad | '+$name) -Completed
+        $sha.Dispose(); $stream.Dispose()
+    }
+}
 function Assert-FileHash([string]$Path, [string]$Expected) {
     if ($Expected -notmatch '^[a-fA-F0-9]{64}$') { throw 'SHA-256 esperado invalido.' }
     Write-Host ('  [...] Comprobando integridad | '+[IO.Path]::GetFileName($Path)) -ForegroundColor DarkGray
-    $h = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $h = Get-Sha256WithProgress $Path
     if ($h -ine $Expected) { throw "SHA-256 incorrecto: $([IO.Path]::GetFileName($Path)). No se habilita para arranque." }
     return $h
 }
@@ -187,6 +216,16 @@ function Assert-Target($Expected, [switch]$PartitionChanged) {
     Assert-UniqueIdentity $current[0] $all
     return $current[0]
 }
+# After an unplug/replug Windows may give the same pendrive another disk number.
+# It is accepted only if every other identity field still matches exactly.
+function Find-ReconnectedTarget($Expected, $Inventory) {
+    $matches = @(foreach ($d in $Inventory) {
+        try { Assert-DiskIdentity $Expected $d -Renumbered; $d } catch {}
+    })
+    if ($matches.Count -ne 1) { return $null }
+    Assert-UniqueIdentity $matches[0] $Inventory
+    return $matches[0]
+}
 function Get-UsbCandidates($Inventory) {
     foreach ($d in $Inventory) {
         if (Test-DiskEligible $d) { continue }
@@ -205,8 +244,8 @@ function Show-UsbCandidates($Candidates) {
     foreach ($d in $Candidates) {
         $position++
         Write-Host ("  [{0}] {1}" -f $position,$d.Model) -ForegroundColor White
-        Write-Host ("      {0:N2} GB | Unidad {1}: | Serie {2}" -f
-            ($d.Size/1e9),$d.Letters,(ConvertTo-DisplaySerial $d.Serial)) -ForegroundColor Gray
+        Write-Host ("      {0:N2} GB | {1} | Serie {2}" -f
+            ($d.Size/1e9),(Format-UsbLetters $d.Letters),(ConvertTo-DisplaySerial $d.Serial)) -ForegroundColor Gray
     }
 }
 function Select-Usb {
@@ -224,6 +263,7 @@ function Select-Usb {
     $target=$candidates[([int]$number-1)]
     return (Assert-Target $target)
 }
+function Format-UsbLetters([string]$Letters) { if ($Letters) { return ('Unidad '+$Letters+':') }; return 'Sin letra asignada' }
 function ConvertTo-DisplaySerial([string]$Serial) { return ($Serial -replace '[\x00-\x1F\x7F]','').Trim() }
 function Get-ConfirmationText($Target) { return "BORRAR $(ConvertTo-DisplaySerial $Target.Serial)" }
 function Assert-Confirmation($Target, [string]$Text) {
@@ -383,23 +423,58 @@ function Expand-VerifiedIso([string]$Zip, [string]$Destination, [long]$Maximum, 
         return $out
     } finally { $z.Dispose() }
 }
+# Windows Security's Controlled Folder Access blocks raw disk writes by apps it does not trust:
+# 1 = enabled, 3 = block disk modification only. Ventoy then fails with ErrCode 5.
+function Get-ControlledFolderPreference {
+    try { return (Get-MpPreference -ErrorAction Stop) } catch { return $null }
+}
+function Test-ControlledFolderBlocks($Preference, [string]$Exe) {
+    if ($null -eq $Preference) { return $false }
+    if ([int]$Preference.EnableControlledFolderAccess -notin @(1,3)) { return $false }
+    $allowed = @($Preference.ControlledFolderAccessAllowedApplications | Where-Object { $_ })
+    return (@($allowed | Where-Object { [string]$_ -ieq $Exe }).Count -eq 0)
+}
+function Open-RansomwareProtection { try { Start-Process 'windowsdefender://RansomwareProtection' } catch {} }
+# RESCUSB never changes Windows security on its own: it explains, opens the page and re-checks.
+function Wait-ControlledFolderAccess([string]$Exe) {
+    $opened = $false
+    while (Test-ControlledFolderBlocks (Get-ControlledFolderPreference) $Exe) {
+        Write-Host ''
+        Write-Host '  [!] Windows no deja que Ventoy escriba en el pendrive.' -ForegroundColor Yellow
+        Write-Host '      Tenés activado «Acceso controlado a carpetas» (protección contra ransomware).' -ForegroundColor Gray
+        Write-Host '      RESCUSB no cambia la seguridad de Windows por su cuenta. Para seguir:' -ForegroundColor Gray
+        Write-Host '      1. En Seguridad de Windows: «Permitir una aplicación a través del Acceso'
+        Write-Host '         controlado a carpetas» → «Agregar una aplicación permitida».'
+        Write-Host '      2. «Examinar todas las aplicaciones» y elegí este archivo (ya está copiado):'
+        Write-Host ('         '+$Exe) -ForegroundColor Cyan
+        Write-Host '      3. Volvé acá y presioná Enter. Todavía no se borró nada.'
+        try { Set-Clipboard -Value $Exe } catch {}
+        if (-not $opened) { Open-RansomwareProtection; $opened = $true }
+        $answer = ([string](Read-Host '  Enter cuando lo hayas permitido | 0 para volver al menú')).Trim()
+        if ($answer -eq '0') { throw [OperationCanceledException]::new('Ventoy no tiene permiso para escribir en el pendrive. No se borró nada.') }
+    }
+}
 function Install-Ventoy($Target, $Item, [string]$StateFolder) {
     Assert-NoVentoyProcess
     # Download/verify BEFORE asking for the final destructive confirmation.
     $local = { $null=Assert-Target $Target }.GetNewClosure()
     $zip = Receive-VerifiedFile $Item (Join-Path $StateFolder 'ventoy') $local 134217728
-    $tools = Join-Path $StateFolder ('tools-' + [guid]::NewGuid().ToString('N'))
+    # Fixed folder: a Controlled Folder Access exception for Ventoy2Disk.exe keeps working.
+    $tools = Join-Path $StateFolder 'ventoy-instalador'
     $null = Assert-SafeDirectory $tools
     # ZIP is pinned by official SHA-256. Extract a fresh copy, never trust a pre-existing exe.
+    if (Test-Path -LiteralPath $tools) { Remove-Item -LiteralPath $tools -Recurse -Force }
     Expand-Archive -LiteralPath $zip -DestinationPath $tools
     $exes = @(Get-ChildItem -LiteralPath $tools -Recurse -File -Filter Ventoy2Disk.exe)
     if ($exes.Count -ne 1) { throw 'Paquete Ventoy inesperado.' }
     $exe = $exes[0].FullName; $working = $exes[0].DirectoryName
-    Write-Host 'ATENCION: SE BORRARAN TODAS LAS PARTICIONES Y ARCHIVOS DEL USB ELEGIDO.' -ForegroundColor Yellow
-    Write-Host ('Pendrive: {0} | {1:N2} GB | Unidad {2}: | Serie {3}' -f $Target.Model,($Target.Size/1e9),$Target.Letters,(ConvertTo-DisplaySerial $Target.Serial)) -ForegroundColor White
+    Wait-ControlledFolderAccess $exe
+    Write-Host ''
+    Write-Host '  ATENCIÓN: SE BORRARÁN TODAS LAS PARTICIONES Y ARCHIVOS DEL PENDRIVE ELEGIDO.' -ForegroundColor Yellow
+    Write-Host ('  Pendrive: {0} | {1:N2} GB | {2} | Serie {3}' -f $Target.Model,($Target.Size/1e9),(Format-UsbLetters $Target.Letters),(ConvertTo-DisplaySerial $Target.Serial)) -ForegroundColor White
     $phrase = Get-ConfirmationText $Target
-    Write-Host "Escriba exactamente: $phrase"
-    Assert-Confirmation $Target (Read-Host 'Confirmacion destructiva')
+    Write-Host "  Para confirmar, escribí exactamente: $phrase"
+    Assert-Confirmation $Target (Read-Host '  Confirmación')
     Assert-NoVentoyProcess
     $null=Assert-Target $Target
     $argsList = @('VTOYCLI','/I',('/PhyDrive:'+$Target.Number),'/FS:EXFAT')
@@ -417,7 +492,13 @@ function Install-Ventoy($Target, $Item, [string]$StateFolder) {
         if ($clock.Elapsed.TotalMinutes -gt 10) { throw "Ventoy no confirmo finalizacion. NO vuelva a instalar mientras siga activo. Revise $working" }
     }
     Write-Progress -Activity 'RESCUSB | Preparando el arranque' -Completed
-    if ((Get-Content -LiteralPath $done -Raw).Trim() -cne '0') { throw "Ventoy informo un fallo. Revise $working\cli_log.txt" }
+    if ((Get-Content -LiteralPath $done -Raw).Trim() -cne '0') {
+        $log = Join-Path $working 'cli_log.txt'
+        if ((Test-Path -LiteralPath $log) -and (Select-String -LiteralPath $log -Pattern 'ErrCode:5' -SimpleMatch -Quiet)) {
+            throw "Ventoy informo un fallo: Windows le nego la escritura en el pendrive (error 5). Suele ser «Acceso controlado a carpetas»: permiti $exe y elegi Armar de nuevo. Detalle en $log"
+        }
+        throw "Ventoy informo un fallo. Revise $log"
+    }
     if (-not $p.WaitForExit(30000)) { throw 'Ventoy sigue activo tras cli_done; se detiene el programa sin matarlo.' }
     $newTarget=Assert-Target $Target -PartitionChanged
     # Partition enumeration can lag; retry reads only, never retry installation automatically.
@@ -444,6 +525,7 @@ function Get-SavedWindowsItem($Item, [string]$StateFolder, [string]$Folder) {
     if($m.file -notmatch '^[A-Za-z0-9_.-]+\.iso$' -or $m.file -match '\.\.'){throw 'Nombre Windows guardado invalido.'}
     $copy.file=$m.file
     if($m.PSObject.Properties['name']){$copy.name=$m.name}
+    if($m.PSObject.Properties['verification']){$copy|Add-Member -NotePropertyName verification -NotePropertyValue $m.verification}
     foreach($suffix in @('','.part')) {
         $p=Join-Path $Folder ($copy.file+$suffix)
         if ((Test-Path -LiteralPath $p) -and (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash -ieq $m.sha256) {
@@ -479,6 +561,8 @@ function Copy-LocalWindows($Item, [string]$Source, [string]$Folder, [scriptblock
     $staged=Join-Path $stage $sourceName
     & $Guard; $null=Assert-FileHash $staged $Item.sha256; Assert-Iso $staged
     Move-Item -LiteralPath $staged -Destination $dest
+    # The staging folder only held this copy and its .ventoyignore marker.
+    if(@(Get-ChildItem -LiteralPath $stage -Force | Where-Object Name -ne '.ventoyignore').Count -eq 0){Remove-Item -LiteralPath $stage -Recurse -Force}
     return $dest
 }
 function Invoke-ImagePlan($Catalog, $Target, [string]$Root, $Selected, [string]$StateFolder, $Prepared=$null) {
@@ -514,6 +598,9 @@ function Invoke-ImagePlan($Catalog, $Target, [string]$Root, $Selected, [string]$
             try { $hash=Assert-FileHash $path $expectedHash }
             catch { Move-InvalidImage $path $guard; throw }
             $status='VERIFICADO'; $detail='Descargado y verificado.'
+            if($item.PSObject.Properties['verification'] -and $item.verification -eq 'firma'){
+                $detail='Copiada de la herramienta de Microsoft; verificada por firma, sin hash publicado.'
+            }
             Write-Host ('  [OK] '+$item.name) -ForegroundColor Green
         } catch { $failed++; $detail=$_.Exception.Message; Write-Warning $detail }
         finally {

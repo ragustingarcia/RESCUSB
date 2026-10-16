@@ -12,15 +12,15 @@ Consultadas el **15/10/2026**. Las versiones fijadas y sus SHA-256 están en `ca
 | Memtest86+ 8.10 x86_64 GRUB | [Página oficial](https://memtest.org/), [SHA-256 del ZIP](https://memtest.org/download/v8.10/sha256sum.txt), [README de arranque](https://memtest.org/readme) |
 | Windows 10 x64 | [Página pública de Microsoft](https://www.microsoft.com/en-us/software-download/windows10ISO) |
 | Windows 11 x64 | [Página pública de Microsoft](https://www.microsoft.com/en-us/software-download/windows11) |
+| Herramienta de creación de medios | [Windows 11](https://go.microsoft.com/fwlink/?linkid=2156295) y [Windows 10](https://go.microsoft.com/fwlink/?LinkId=691209); ver la sección Windows |
 
-## Automatización de Windows
+## Windows
 
-`Rescusb.Microsoft.psm1` consulta la página pública, su selector de edición y su tabla SHA-256 por idioma y arquitectura. Descubre los parámetros del cliente JavaScript publicado por Microsoft e inicializa la sesión anónima que esa página utiliza con `ov-df.microsoft.com`. Solo lee campos concretos; **no ejecuta JavaScript remoto**.
+RESCUSB no pide enlaces de descarga a los servicios internos de Microsoft. Windows se obtiene siempre con la **herramienta de creación de medios** oficial:
 
-Los idiomas y enlaces se consultan en el servicio de la misma página, bajo `www.microsoft.com/software-download-connector/api/`. Es un flujo web público que puede cambiar; **no se presenta como una API de soporte estable de Microsoft**. Un rechazo, una edición ambigua, un hash ausente o un cambio de estructura detienen la preparación antes del borrado. No se eluden denegaciones ni se cambia de red/ubicación.
-
-Las ISO se aceptan únicamente desde los nombres exactos de servidores Microsoft permitidos, por HTTPS, con arquitectura x64, identidad de versión y hash oficial. El programa no contiene enlaces firmados reutilizados ni los guarda en los informes. Se auditaron como referencia de interoperabilidad el cliente público de Microsoft y [Fido, del autor de Rufus](https://github.com/pbatard/Fido); Fido no es una dependencia, no se incluye su código y no se ejecuta.
-
+- [Windows 11](https://go.microsoft.com/fwlink/?linkid=2156295) y [Windows 10](https://go.microsoft.com/fwlink/?LinkId=691209) se sirven desde `download.microsoft.com`. La herramienta solo se ejecuta si `Get-AuthenticodeSignature` la da como válida y firmada por Microsoft Corporation.
+- La ISO generada se acepta si `setup.exe` y `sources\setup.exe` tienen firma válida de Microsoft. Además, [`Get-WindowsImage`](https://learn.microsoft.com/en-us/powershell/module/dism/get-windowsimage) (DISM) tiene que informar arquitectura x64 (valor 9), el idioma elegido y la versión correcta.
+- `Rescusb.Microsoft.psm1` solo lee la tabla pública de SHA-256 de la página de descarga, para preferir una ISO que coincida con el hash publicado.
 ## Arranque y formato
 
 - [CLI de Ventoy](https://www.ventoy.net/en/doc_windows_cli.html): `VTOYCLI /I /PhyDrive:n /FS:EXFAT`, MBR y soporte Secure Boot por defecto. El resultado se confirma mediante `cli_done.txt`, donde 0 significa éxito.
