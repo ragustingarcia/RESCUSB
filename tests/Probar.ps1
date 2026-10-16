@@ -222,12 +222,13 @@ try {
         Reject {Expand-VerifiedIso $zip $folder 100 $guard}
     }
     Check 'atomic JSON roundtrip' {$p=Join-Path $temp 'report.json';Save-JsonAtomic @{ok=$true} $p;Equal (Get-Content $p -Raw|ConvertFrom-Json).ok $true}
-    Check 'local Windows ISO copy: verified, restartable, staging hidden from Ventoy' {
+    Check 'local Windows ISO copy: verified, restartable, staging removed when done' {
         $localItem=$item|ConvertTo-Json|ConvertFrom-Json;$localItem.kind='windows';$localItem.id='windows11';$localItem.file='Windows11-x64.iso'
         $f=Join-Path $temp 'local';$null=New-Item -ItemType Directory -Path $f
         $out=Copy-LocalWindows $localItem $fixture $f {} 0
         Equal ($out -is [string]) $true;Equal (Assert-FileHash $out $hash) $hash
-        Equal (Test-Path -LiteralPath (Join-Path $f '.local-windows11\.ventoyignore')) $true
+        # The staging folder (hidden from Ventoy while copying) is removed once the ISO is in place.
+        Equal (Test-Path -LiteralPath (Join-Path $f '.local-windows11')) $false
     }
     Check 'display shows only eligible removable USB, never internal or fixed USB disks' {
         $usb=New-FakeDisk

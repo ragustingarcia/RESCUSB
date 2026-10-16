@@ -6,6 +6,22 @@ Fecha: **15/10/2026**. Motor probado: **Windows PowerShell 5.1**, el mismo que u
 
 **102 casos aprobados, 0 fallos**: 72 pruebas de controles y transferencias en `tests/Probar.ps1`, 24 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
 
+## Primera preparación real completa (16/10/2026)
+
+Con el Kingston DataTraveler 3.0 de 61,99 GB, RESCUSB 2.1.0 terminó en **LISTO: 6 de 6 herramientas preparadas y verificadas**:
+
+| Imagen | Tamaño | Resultado |
+|---|---|---|
+| SystemRescue 13.02 | 1.318 MB | Descargada y verificada por hash publicado |
+| Memtest86+ 8.10 | 19 MB | Extraída del ZIP verificado |
+| Hiren's BootCD PE 1.0.8 | 3.139 MB | Descargada y verificada por hash publicado |
+| Rescuezilla 2.6.2 | 1.642 MB | Descargada y verificada por hash publicado |
+| Ubuntu 26.04.1 | 6.182 MB | Descargada y verificada por hash publicado |
+| Windows 11 (español, x64) | 6.901 MB | Creada con la herramienta de Microsoft, verificada por firma y DISM, copiada y releída |
+
+Ventoy 1.1.18 se instaló en MBR con exFAT y VTOYEFI. Para eso hubo que permitir `Ventoy2Disk.exe` en Acceso controlado a carpetas, y RESCUSB lo indicó antes del borrado. El pendrive quedó con 18,8 GB usados y 38,9 GB libres, y `RESCUSB-ESTADO.json` registra `complete: true` y ningún pendiente. El puerto entregaba 32 MB/s de lectura, por lo que las verificaciones dominaron el tiempo total.
+
+**Sigue pendiente la prueba de arranque** en un equipo real (UEFI y Legacy, con y sin Secure Boot). `bootTested` sigue en `false` hasta hacerla.
 ## Cambios de 2.1.0
 
 En la prueba real, Microsoft volvió a negar el enlace automático, y en un navegador de Windows su página manda a la herramienta de creación de medios. La ISO que genera esa herramienta no tiene hash publicado, así que con la 2.0.3 Windows nunca podía completarse.
@@ -92,7 +108,7 @@ Se repitió una reanudación HTTP real de Memtest desde un archivo nuevo de 1.02
 
 ## Lo que sigue pendiente
 
-No se formateó ni se escribió ningún pendrive durante el desarrollo. Quedan pendientes la instalación real de Ventoy, detección de sus volúmenes después de formatear, descarga íntegra de las ISO grandes sobre ese USB y arranque físico de las imágenes en equipos Legacy/UEFI y sus configuraciones de Secure Boot.
+La instalación real de Ventoy, la detección de sus volúmenes y la descarga íntegra de las ISO sobre el USB ya se validaron (ver «Primera preparación real completa»). Queda pendiente el arranque físico de las imágenes en equipos Legacy/UEFI y sus configuraciones de Secure Boot.
 
 No se descargaron completas las ISO de Windows, SystemRescue, Hiren, Rescuezilla ni Ubuntu. La obtención de metadatos, enlaces y hashes no equivale a verificar todos los bytes de esas imágenes. RESCUSB solo marca LISTO cuando el usuario ejecuta el flujo y todas las imágenes elegidas terminan correctamente. El campo `bootTested` permanece en false porque no representa una prueba física.
 

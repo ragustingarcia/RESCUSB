@@ -561,6 +561,8 @@ function Copy-LocalWindows($Item, [string]$Source, [string]$Folder, [scriptblock
     $staged=Join-Path $stage $sourceName
     & $Guard; $null=Assert-FileHash $staged $Item.sha256; Assert-Iso $staged
     Move-Item -LiteralPath $staged -Destination $dest
+    # The staging folder only held this copy and its .ventoyignore marker.
+    if(@(Get-ChildItem -LiteralPath $stage -Force | Where-Object Name -ne '.ventoyignore').Count -eq 0){Remove-Item -LiteralPath $stage -Recurse -Force}
     return $dest
 }
 function Invoke-ImagePlan($Catalog, $Target, [string]$Root, $Selected, [string]$StateFolder, $Prepared=$null) {
