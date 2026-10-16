@@ -35,7 +35,8 @@ function Get-RescusbCachedHash($File) {
     # A 6 GB ISO takes a while to hash; Windows 10 and 11 may inspect the same file.
     $key=$File.FullName+'|'+$File.Length+'|'+$File.LastWriteTimeUtc.Ticks
     if(-not $script:RescusbHashCache.ContainsKey($key)){
-        $script:RescusbHashCache[$key]=(Get-FileHash -LiteralPath $File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        Write-Host ('  [...] Calculando el SHA-256 | '+$File.Name) -ForegroundColor DarkGray
+        $script:RescusbHashCache[$key]=Get-Sha256WithProgress $File.FullName
     }
     return $script:RescusbHashCache[$key]
 }

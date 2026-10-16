@@ -101,10 +101,39 @@ function Test-OfficialChecksum($Item) {
     } else { $actual = Get-ChecksumFromText $text $Item.file }
     if ($actual -ine $Item.sha256) { throw "El checksum publicado cambio: $($Item.name). Actualice el catalogo revisando la fuente oficial." }
 }
+# Re-reading a multi-GB image from a USB 2.0 pendrive takes minutes: show speed and time left
+# so a long verification never looks frozen.
+function Get-Sha256WithProgress([string]$Path) {
+    $name = [IO.Path]::GetFileName($Path)
+    $stream = New-Object IO.FileStream($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read, 4194304)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $total = [math]::Max(1L, $stream.Length); $done = 0L
+        $buffer = New-Object byte[] 4194304
+        $clock = [Diagnostics.Stopwatch]::StartNew(); $shown = -1
+        while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $null = $sha.TransformBlock($buffer, 0, $read, $null, 0)
+            $done += $read
+            $second = [int]$clock.Elapsed.TotalSeconds
+            if ($second -ne $shown -and $clock.Elapsed.TotalSeconds -ge 1) {
+                $shown = $second
+                $speed = $done / [math]::Max(0.001, $clock.Elapsed.TotalSeconds)
+                $left = [int](($total - $done) / [math]::Max(1, $speed))
+                $status = '{0:N0} de {1:N0} MB | {2:N0} MB/s | faltan {3}' -f ($done/1MB), ($total/1MB), ($speed/1MB), ([TimeSpan]::FromSeconds($left).ToString('mm\:ss'))
+                Write-Progress -Activity ('RESCUSB | Comprobando integridad | '+$name) -Status $status -PercentComplete ([int](100 * $done / $total))
+            }
+        }
+        $null = $sha.TransformFinalBlock($buffer, 0, 0)
+        return (-join ($sha.Hash | ForEach-Object { $_.ToString('x2') }))
+    } finally {
+        Write-Progress -Activity ('RESCUSB | Comprobando integridad | '+$name) -Completed
+        $sha.Dispose(); $stream.Dispose()
+    }
+}
 function Assert-FileHash([string]$Path, [string]$Expected) {
     if ($Expected -notmatch '^[a-fA-F0-9]{64}$') { throw 'SHA-256 esperado invalido.' }
     Write-Host ('  [...] Comprobando integridad | '+[IO.Path]::GetFileName($Path)) -ForegroundColor DarkGray
-    $h = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $h = Get-Sha256WithProgress $Path
     if ($h -ine $Expected) { throw "SHA-256 incorrecto: $([IO.Path]::GetFileName($Path)). No se habilita para arranque." }
     return $h
 }

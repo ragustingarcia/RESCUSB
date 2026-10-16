@@ -63,7 +63,13 @@ try{
         & $ms {param($f);$script:HttpFailure=$true;$script:IsoFolders=@($f)} $toolFolder
         Equal (Resolve-MicrosoftIso $win11 (Join-Path $temp 'offline') 'Spanish').Item.verification 'firma'
         & $ms {$script:HttpFailure=$false;$script:IsoFolders=@()}
-    }    Check 'Microsoft signature required: system binary accepted, unsigned file rejected' {
+    }    Check 'SHA-256 with progress matches Get-FileHash across buffers and for empty files' {
+        $big=Join-Path $temp 'grande.bin';$bytes=New-Object byte[] 9437185;(New-Object Random 7).NextBytes($bytes);[IO.File]::WriteAllBytes($big,$bytes)
+        Equal (Get-Sha256WithProgress $big) (Get-FileHash -LiteralPath $big -Algorithm SHA256).Hash.ToLower()
+        $empty=Join-Path $temp 'vacio.bin';[IO.File]::WriteAllBytes($empty,[byte[]]@())
+        Equal (Get-Sha256WithProgress $empty) (Get-FileHash -LiteralPath $empty -Algorithm SHA256).Hash.ToLower()
+    }
+    Check 'Microsoft signature required: system binary accepted, unsigned file rejected' {
         Assert-MicrosoftSignature (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe')
         $unsigned=Join-Path $temp 'setup.exe';[IO.File]::WriteAllBytes($unsigned,[byte[]](77,90,0,0));Reject {Assert-MicrosoftSignature $unsigned} 'firma'
     }

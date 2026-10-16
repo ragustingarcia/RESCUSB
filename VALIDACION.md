@@ -4,7 +4,7 @@ Fecha: **15/10/2026**. Motor probado: **Windows PowerShell 5.1**, el mismo que u
 
 ## Pruebas automáticas sin dispositivos reales
 
-**101 casos aprobados, 0 fallos**: 72 pruebas de controles y transferencias en `tests/Probar.ps1`, 23 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
+**102 casos aprobados, 0 fallos**: 72 pruebas de controles y transferencias en `tests/Probar.ps1`, 24 pruebas de automatización, integración y autoría en `tests/Probar-Rescusb.ps1`, y 6 regresiones adicionales en `tests/Probar-Revalidacion.ps1`.
 
 ## Cambios de 2.1.0
 
@@ -15,6 +15,7 @@ En la prueba real, Microsoft volvió a negar el enlace automático, y en un nave
 - **La ISO se verifica por firma.** Se monta en solo lectura y se exige firma válida de Microsoft en `setup.exe` y `sources\setup.exe`. Con DISM, la primera imagen tiene que ser x64, del idioma elegido y de la versión correcta. Se copia con su SHA-256 propio y el informe la marca como verificada por firma. Si hay una ISO que coincide con el hash publicado en la página de Microsoft, se prefiere esa.
 - **Windows 10 opcional.** Sin soporte desde el 14/10/2025, deja de venir marcado por defecto.
 - Comprobar fuentes ya no falla por Windows: informa que se crea al armar el pendrive.
+- **Verificaciones con progreso.** En la prueba real, el Kingston leía a 32 MB/s (el techo de un puerto USB 2.0). Cada pasada de verificación de Hiren's (3,1 GB) tardaba casi 2 minutos sin ninguna señal en pantalla, y parecía colgado. El SHA-256 ahora se calcula por bloques y muestra MB leídos, velocidad y tiempo restante, también para la ISO de Windows.
 - **Acceso controlado a carpetas.** En la primera instalación real, Ventoy borró las particiones del Kingston, pero las tres escrituras de formato recibieron `ErrCode:5`. Defender registró el evento 1127: el Acceso controlado a carpetas impidió que Ventoy2Disk.exe modificara `\Device\Harddisk1\DR12`. Ahora:
   - antes de pedir la confirmación, RESCUSB lee `Get-MpPreference`. Si la protección está en modo 1 o 3 y Ventoy no figura como permitido, se detiene, abre Seguridad de Windows, copia la ruta y espera; con 0 vuelve sin borrar;
   - Ventoy se extrae siempre en `estado\ventoy-instalador`, de nuevo y verificado en cada corrida, para que la excepción se mantenga;
