@@ -236,7 +236,18 @@ function Resolve-RescusbPlanGaps($Plan,$Selected,[string]$StateFolder='',[string
 }
 # Creating Windows can take an hour: if the pendrive vanished meanwhile, ask to plug it
 # back in and recognise it by its identity instead of sending the user back to the menu.
-function Wait-RescusbTarget($Target) {
+function Wait-RescusbTarget($Target,[int]$Retries=6,[int]$DelaySeconds=2) {
+    # Right after the Windows ISO is dismounted, Windows can take a few seconds to list
+    # the disks again. Retry quietly before asking the user to replug anything.
+    for($i=0;$i -lt $Retries;$i++){
+        try {return (Assert-Target $Target)}
+        catch {if($_.Exception.Message -notlike '*ya no esta conectado*'){throw}}
+        if($i -eq 0){Write-Host '  [...] Esperando que Windows vuelva a listar el pendrive' -ForegroundColor DarkGray}
+        Start-Sleep -Seconds $DelaySeconds
+        try {Update-HostStorageCache -ErrorAction Stop} catch {}
+        $found=Find-ReconnectedTarget $Target @(Get-DiskInventory)
+        if($found){$Target=$found}
+    }
     while($true){
         try {return (Assert-Target $Target)}
         catch {if($_.Exception.Message -notlike '*ya no esta conectado*'){throw}}

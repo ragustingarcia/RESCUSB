@@ -155,7 +155,7 @@ try{
         Equal (& $ui {$script:ToolRuns}) 2;Equal (& $ui {$script:SelectedCount}) 7
         & $ui {$script:GapAnswer='0'}
     }
-    Check 'pendrive that vanished before erasing is awaited and reused, not abandoned' {
+    Check 'pendrive briefly missing is retried quietly; one really unplugged is awaited, not abandoned' {
         & $ui {
             $script:Gone=$true;$script:Replugs=0
             function script:Assert-Target {param($Expected,[switch]$PartitionChanged);if($Expected.Number -eq 9 -and $script:Gone){throw 'El USB elegido ya no esta conectado.'};return $Expected}
@@ -163,10 +163,14 @@ try{
             function script:Find-ReconnectedTarget {param($Expected,$Inventory);return $Inventory[0]}
             $script:SavedAnswer=$script:GapAnswer;$script:GapAnswer=''
         }
-        Equal (Wait-RescusbTarget (FakeDisk)).Number 5
-        Equal (& $ui {$script:Replugs}) 1
+        & $ui {$script:GapPrompts=0}
+        Equal (Wait-RescusbTarget (FakeDisk) -DelaySeconds 0).Number 5
+        Equal (& $ui {$script:GapPrompts}) 0
+        & $ui {function script:Find-ReconnectedTarget {param($Expected,$Inventory);if($script:GapPrompts -gt 0){return $Inventory[0]};return $null}}
+        Equal (Wait-RescusbTarget (FakeDisk) -DelaySeconds 0).Number 5
+        Equal (& $ui {$script:GapPrompts}) 1
         & $ui {$script:GapAnswer='0'}
-        Reject {Wait-RescusbTarget (FakeDisk)} 'no está conectado'
+        Reject {Wait-RescusbTarget (FakeDisk) -Retries 0} 'no está conectado'
         & $ui {
             $script:GapAnswer=$script:SavedAnswer
             function script:Assert-Target {param($Expected,[switch]$PartitionChanged);return $Expected}

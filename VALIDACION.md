@@ -20,7 +20,7 @@ En la prueba real, Microsoft volvió a negar el enlace automático, y en un nave
   - Ventoy se extrae siempre en `estado\ventoy-instalador`, de nuevo y verificado en cada corrida, para que la excepción se mantenga;
   - si igual aparece `ErrCode:5`, el error lo explica como un bloqueo de escritura de Windows;
   - la confirmación pasó a voseo y con tildes, y una unidad sin letra se muestra como «Sin letra asignada».
-- **Reconexión del pendrive.** En la prueba real, el Kingston desapareció de Windows mientras se creaba Windows 11 y el programa volvía al menú. Ahora, antes del borrado, RESCUSB avisa, espera a que lo vuelvas a conectar y lo reconoce aunque cambie el número de disco. Exige que coincidan modelo, capacidad, las dos series, el identificador PNP y la ruta; nunca adopta otro dispositivo.
+- **Reconexión del pendrive.** En la prueba real, el Kingston desapareció de Windows mientras se creaba Windows 11 y el programa volvía al menú. Ahora, antes del borrado, RESCUSB avisa, espera a que lo vuelvas a conectar y lo reconoce aunque cambie el número de disco. Exige que coincidan modelo, capacidad, las dos series, el identificador PNP y la ruta; nunca adopta otro dispositivo. En la segunda prueba real, el aviso apareció justo después de desmontar la ISO y el pendrive se reconoció solo con Enter, sin reconectarlo: Windows tardaba unos segundos en volver a listarlo. Por eso primero reintenta en silencio unos 12 segundos, refrescando el inventario de almacenamiento, y recién después pide reconectar.
 
 Las pruebas nuevas cubren:
 
